@@ -4,7 +4,7 @@ version = "0.1.2"
 description = "A simple wrapper around sqlalchemy to make it easier to use with postgresql"
 authors = ["jsaied99 <jsaied99@gmail.com>"]
 readme = "README.md"
-# repository = ""
+repository = "https://github.com/jsaied99/pg-alchemy-kit"
 packages = [{ include = "pg_alchemy_kit" }]
 
 [tool.poetry.dependencies]
