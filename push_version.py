@@ -26,7 +26,7 @@ def update_poetry(version: str):
     """
     subprocess.run(["poetry", "version", version], check=True)
     subprocess.run(["poetry", "build"], check=True)
-    subprocess.run(["poetry", "publish", "-r", "tva_repo"], check=True)
+    subprocess.run(["poetry", "publish"], check=True)
 
 
 if __name__ == "__main__":
