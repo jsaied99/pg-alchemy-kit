@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pg-alchemy-kit"
-version = "0.2.0"
+version = "0.2.1"
 description = "A simple wrapper around sqlalchemy to make it easier to use with postgresql"
 authors = ["jsaied99 <jsaied99@gmail.com>"]
 readme = "README.md"
@@ -9,8 +9,8 @@ packages = [{ include = "pg_alchemy_kit" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-sqlalchemy = "1.4.41"
 psycopg2-binary = "2.9.3"
+sqlalchemy = "^2.0.20"
 
 
 [build-system]
