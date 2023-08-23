@@ -71,6 +71,3 @@ class PG:
 
     def close(cls):
         cls.engine.dispose()
-
-
-db = PG()

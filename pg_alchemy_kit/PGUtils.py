@@ -17,8 +17,10 @@ class PGUtils:
         cls.session = session
 
     @staticmethod
-    def wrap_to_json(stmt: str) -> text:
-        stmt = stmt.replace(";", "")
+    def wrap_to_json(stmt: Union[str, text]) -> text:
+        if type(stmt) == str:
+            stmt = stmt.replace(";", "")
+
         return text(f"SELECT json_agg(t) FROM ({stmt}) t")
 
     def select(
