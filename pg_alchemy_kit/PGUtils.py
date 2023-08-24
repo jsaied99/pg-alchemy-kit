@@ -69,7 +69,7 @@ class PGUtils:
         except DBAPIError as e:
             raise e
 
-    def update(
+    def update_orm(
         cls, session: Session, model: Any, key_value: dict, update_values: dict
     ) -> Union[bool, None]:
         try:
@@ -84,6 +84,18 @@ class PGUtils:
             return True
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
+            session.rollback()
+            raise e
+
+    def bulk_update_orm(
+        cls, session: Session, model: Any, records: List[dict]
+    ) -> Union[bool, None]:
+        try:
+            session.bulk_update_mappings(model, records)
+            session.commit()
+            return True
+        except DBAPIError as e:
+            cls.logger.info(f"Error in bulk_update: {e}")
             session.rollback()
             raise e
 
