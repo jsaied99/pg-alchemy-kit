@@ -23,13 +23,11 @@ class PGUtils:
 
         return text(f"SELECT json_agg(t) FROM ({stmt}) t")
 
-    def select(
-        cls, session: Session, sql: str, **kwargs
-    ) -> Union[List[dict], None]:
+    def select(cls, session: Session, sql: str, **kwargs) -> Union[List[dict], None]:
         try:
             params = kwargs.get("params", {})
             to_camel_case = kwargs.get("to_camel_case", False)
-            
+
             stmt: text = cls.wrap_to_json(sql)
             results = session.execute(stmt, params=params).fetchone()[0]
             if results is None:
@@ -37,7 +35,7 @@ class PGUtils:
 
             if to_camel_case:
                 results = cls.results_to_camel_case(results)
-            
+
             return results
         except DBAPIError as e:
             raise e
@@ -105,9 +103,16 @@ class PGUtils:
             session.rollback()
             raise e
 
-    def insert_orm(cls, session: Session, model, kwargs) -> Union[object, None]:
+    def insert_orm(
+        cls, session: Session, model, record: dict, **kwargs
+    ) -> Union[object, None]:
         try:
-            obj = model(**kwargs)
+            to_snake_case = kwargs.get("to_snake_case", False)
+
+            if to_snake_case:
+                record = cls.to_snake_case([record])[0]
+
+            obj = model(**record)
             session.add(obj)
             session.commit()
             return obj
@@ -174,8 +179,40 @@ class PGUtils:
         except Exception as e:
             cls.logger.info(f"Error in get_uuid: {e}")
             return None
-    
-    
+
+    @staticmethod
+    def __to_snake_case(camel_str: str) -> str:
+        """
+        Convert a camelCase string to snake_case.
+
+        Parameters:
+        camel_str (str): The camelCase string to convert.
+
+        Returns:
+        str: The string in snake_case.
+        """
+        snake_str = camel_str[0].lower()
+        for char in camel_str[1:]:
+            if char.isupper():
+                snake_str += "_"
+            snake_str += char.lower()
+        return snake_str
+
+    def to_snake_case(cls, results: List[dict]) -> List[dict]:
+        """
+        Convert all keys in a list of dictionaries from camelCase to snake_case.
+
+        Parameters:
+        results (List[Dict[str, any]]): A list of dictionaries with camelCase keys.
+
+        Returns:
+        List[Dict[str, any]]: A list of dictionaries with keys in snake_case.
+        """
+        return [
+            {cls.__to_snake_case(key): value for key, value in record.items()}
+            for record in results
+        ]
+
     @staticmethod
     def __to_camel_case(snake_str: str) -> str:
         """
@@ -187,8 +224,8 @@ class PGUtils:
         Returns:
         str: The string in camelCase.
         """
-        components = snake_str.split('_')
-        return components[0] + ''.join(x.title() for x in components[1:])
+        components = snake_str.split("_")
+        return components[0] + "".join(x.title() for x in components[1:])
 
     def results_to_camel_case(cls, results: List[dict]) -> List[dict]:
         """
@@ -200,7 +237,11 @@ class PGUtils:
         Returns:
         List[Dict[str, any]]: A list of dictionaries with keys in camelCase.
         """
-        return [{cls.__to_camel_case(key): value for key, value in record.items()} for record in results]
+        return [
+            {cls.__to_camel_case(key): value for key, value in record.items()}
+            for record in results
+        ]
+
 
 def get_engine(url: str, **kwargs) -> Engine:
     try:
