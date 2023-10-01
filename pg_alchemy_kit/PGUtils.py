@@ -168,7 +168,33 @@ class PGUtils:
         except Exception as e:
             cls.logger.info(f"Error in get_uuid: {e}")
             return None
+    
+    
+    @staticmethod
+    def __to_camel_case(snake_str: str) -> str:
+        """
+        Convert a snake_case string to camelCase.
 
+        Parameters:
+        snake_str (str): The snake_case string to convert.
+
+        Returns:
+        str: The string in camelCase.
+        """
+        components = snake_str.split('_')
+        return components[0] + ''.join(x.title() for x in components[1:])
+
+    def results_to_camel_case(cls, results: List[dict]) -> List[dict]:
+        """
+        Convert all keys in a list of dictionaries from snake_case to camelCase.
+
+        Parameters:
+        results (List[Dict[str, any]]): A list of dictionaries with snake_case keys.
+
+        Returns:
+        List[Dict[str, any]]: A list of dictionaries with keys in camelCase.
+        """
+        return [{cls.__to_camel_case(key): value for key, value in record.items()} for record in results]
 
 def get_engine(url: str, **kwargs) -> Engine:
     try:
