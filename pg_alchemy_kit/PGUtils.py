@@ -1,6 +1,6 @@
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm.session import Session
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Select
 from sqlalchemy.engine.base import Engine
 import logging
 from typing import Any, List, Union
@@ -37,6 +37,18 @@ class PGUtils:
                 results = cls.results_to_camel_case(results)
 
             return results
+        except DBAPIError as e:
+            raise e
+
+    def select_orm(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[List[dict], None]:
+        try:
+            results = session.execute(stmt).scalars().all()
+            if results is None:
+                return []
+
+            return [record.to_dict() for record in results]
         except DBAPIError as e:
             raise e
 
