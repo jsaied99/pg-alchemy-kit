@@ -85,6 +85,12 @@ class PGUtils:
         except DBAPIError as e:
             raise e
 
+    def execute_orm(cls, session: Session, stmt: Select) -> Union[bool, None]:
+        try:
+            return session.execute(stmt).fetchall()
+        except DBAPIError as e:
+            raise e
+
     def update_orm(
         cls, session: Session, model: Any, key_value: dict, update_values: dict
     ) -> Union[bool, None]:
@@ -134,25 +140,20 @@ class PGUtils:
             return None
 
     def bulk_insert_orm(
-        cls, session: Session, model: Any, records: List[dict]
-    ) -> Union[List[uuid.UUID], List[dict]]:
+        cls, session: Session, model: Any, records: List[dict], **kwargs
+    ) -> List[dict]:
         try:
-            inserted_ids = []
-
             records_to_insert: List[dict] = [model(**record) for record in records]
 
             session.add_all(records_to_insert)
             session.flush()  # Flush the records to obtain their IDs
-
             records: dict = [record.to_dict() for record in records_to_insert]
-            for record in records_to_insert:
-                inserted_ids.append(record.uuid)
             session.commit()
-            return inserted_ids, records
+            return records
         except DBAPIError as e:
             cls.session.rollback()
             cls.logger.info(f"Error in add_records_sync: {e}")
-            return [], []
+            return []
 
     def insert_orm_on_conflict(
         cls,
