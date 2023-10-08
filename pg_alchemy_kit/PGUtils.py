@@ -9,9 +9,10 @@ import os
 
 
 class PGUtils:
-    def __init__(cls, logger: logging.Logger):
+    def __init__(cls, logger: logging.Logger, single_transaction: bool = False):
         cls.session = None
         cls.logger = logger
+        cls.single_transaction = single_transaction
 
     def initialize(cls, session: Session):
         cls.session = session
@@ -58,7 +59,9 @@ class PGUtils:
             insert = session.execute(stmt, params=params)
             count = insert.rowcount
             cls.logger.info(f"Inserted {count} rows")
-            session.commit()
+
+            if not cls.single_transaction:
+                session.commit()
 
             return count > 0
         except DBAPIError as e:
@@ -70,7 +73,8 @@ class PGUtils:
             insert = session.execute(stmt, params=params)
             count = insert.rowcount
             cls.logger.info(f"Deleted {count} rows")
-            session.commit()
+            if not cls.single_transaction:
+                session.commit()
 
             return count > 0
         except DBAPIError as e:
@@ -102,7 +106,8 @@ class PGUtils:
                 f"UPDATE {model().table_name()} SET {update_stmt} WHERE {key} = :{key}"
             )
             session.execute(stmt, {**key_value, **update_values})
-            session.commit()
+            if not cls.single_transaction:
+                session.commit()
             return True
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
@@ -114,11 +119,13 @@ class PGUtils:
     ) -> Union[bool, None]:
         try:
             session.bulk_update_mappings(model, records)
-            session.commit()
+            if not cls.single_transaction:
+                session.commit()
             return True
         except DBAPIError as e:
             cls.logger.info(f"Error in bulk_update: {e}")
-            session.rollback()
+            if not cls.single_transaction:
+                session.rollback()
             raise e
 
     def insert_orm(
@@ -132,7 +139,8 @@ class PGUtils:
 
             obj = model(**record)
             session.add(obj)
-            session.commit()
+            if not cls.single_transaction:
+                session.commit()
             return obj
         except DBAPIError as e:
             cls.logger.info(f"Error in add_record_sync: {e}")
@@ -148,7 +156,10 @@ class PGUtils:
             session.add_all(records_to_insert)
             session.flush()  # Flush the records to obtain their IDs
             records: dict = [record.to_dict() for record in records_to_insert]
-            session.commit()
+
+            if not cls.single_transaction:
+                session.commit()
+
             return records
         except DBAPIError as e:
             cls.session.rollback()
@@ -169,11 +180,13 @@ class PGUtils:
             session.query(model).filter(model.uuid.in_(records)).delete(
                 synchronize_session=False
             )
-            session.commit()
+            if not cls.single_transaction:
+                session.commit()
             cls.logger.info(f"Deleted {len(records)} records")
             return True
         except DBAPIError as e:
-            session.rollback()
+            if not cls.single_transaction:
+                session.rollback()
             cls.logger.info(f"Error in remove_records_sync: {e}")
             return False
 

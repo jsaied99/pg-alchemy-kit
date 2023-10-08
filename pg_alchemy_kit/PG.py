@@ -12,7 +12,13 @@ from typing import List, Iterator
 
 
 class PG:
-    def initialize(cls, url: str = None, logger: logging.Logger = None, **kwargs):
+    def initialize(
+        cls,
+        url: str = None,
+        logger: logging.Logger = None,
+        single_transaction: bool = False,
+        **kwargs,
+    ):
         url = url or get_engine_url()
         cls.engine: Engine = get_engine(url, **kwargs)
         cls.SessionLocal = sessionmaker(
@@ -27,7 +33,7 @@ class PG:
             logger.addHandler(logging.StreamHandler())
             cls.logger = logger
 
-        cls.utils = PGUtils(cls.logger)
+        cls.utils = PGUtils(cls.logger, single_transaction)
 
         cls.logger.info("Initialized PG")
 
@@ -59,6 +65,18 @@ class PG:
             finally:
                 session.close()
 
+    @contextmanager
+    def transaction(cls) -> Iterator[Session]:
+        with cls.SessionLocal() as session:
+            try:
+                yield session
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                raise e
+            finally:
+                session.close()
+
     def get_session(cls) -> Iterator[Session]:
         with cls.SessionLocal() as session:
             try:
@@ -71,5 +89,6 @@ class PG:
 
     def close(cls):
         cls.engine.dispose()
+
 
 db = PG()
