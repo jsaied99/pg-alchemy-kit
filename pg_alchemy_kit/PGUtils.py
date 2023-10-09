@@ -62,6 +62,8 @@ class PGUtils:
 
             if not cls.single_transaction:
                 session.commit()
+            else:
+                session.flush()
 
             return count > 0
         except DBAPIError as e:
@@ -141,6 +143,8 @@ class PGUtils:
             session.add(obj)
             if not cls.single_transaction:
                 session.commit()
+            else:
+                session.flush()
             return obj
         except DBAPIError as e:
             cls.logger.info(f"Error in add_record_sync: {e}")
