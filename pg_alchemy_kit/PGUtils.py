@@ -151,18 +151,16 @@ class PGUtils:
             value_id = values.pop("id")
             args = cls.to_snake_case([values])
 
-            result = cls.execute_orm(
-                session,
-                update(Model)
-                .where(Model.id == value_id)
-                .values(*args)
-                .returning(Model),
+            stmt = (
+                update(Model).where(Model.id == value_id).values(*args).returning(Model)
             )
+
+            result = session.execute(stmt).scalars().all()
 
             if not cls.single_transaction:
                 session.commit()
 
-            return result[0][0]
+            return result
 
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
