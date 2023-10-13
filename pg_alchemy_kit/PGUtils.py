@@ -2,10 +2,38 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm.session import Session
 from sqlalchemy import create_engine, text, Select
 from sqlalchemy.engine.base import Engine
+from sqlalchemy import update
+
 import logging
 from typing import Any, List, Union
 import uuid
 import os
+import warnings
+
+
+def deprecated(func):
+    def wrapper(*args, **kwargs):
+        warnings.warn(
+            f"Call to deprecated function {func.__name__}. {func.__doc__}",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+class BaseModel:
+    id: int
+
+    def __init__(self):
+        pass
+
+    def table_name(self) -> str:
+        return self.__tablename__
+
+    def to_dict(self) -> dict:
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
 class PGUtils:
@@ -97,9 +125,11 @@ class PGUtils:
         except DBAPIError as e:
             raise e
 
+    @deprecated
     def update_orm(
         cls, session: Session, model: Any, key_value: dict, update_values: dict
     ) -> Union[bool, None]:
+        """This method is deprecated. Use update() instead."""
         try:
             key = list(key_value.keys())[0]
             update_stmt = " , ".join([f"{k} = :{k}" for k in update_values.keys()])
@@ -114,6 +144,30 @@ class PGUtils:
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
             session.rollback()
+            raise e
+
+    def update(cls, session: Session, Model: BaseModel, values: dict) -> BaseModel:
+        try:
+            value_id = values.pop("id")
+            args = cls.to_snake_case([values])
+
+            result = cls.execute_orm(
+                session,
+                update(Model)
+                .where(Model.id == value_id)
+                .values(*args)
+                .returning(Model),
+            )
+
+            if not cls.single_transaction:
+                session.commit()
+
+            return result[0][0]
+
+        except DBAPIError as e:
+            cls.logger.info(f"Error in update: {e}")
+            if not cls.single_transaction:
+                session.rollback()
             raise e
 
     def bulk_update_orm(
