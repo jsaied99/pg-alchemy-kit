@@ -158,21 +158,19 @@ class PGUtils:
             session.rollback()
             raise e
 
-    def update(cls, session: Session, Model: BaseModel, values: dict) -> BaseModel:
+    def update(
+        cls, session: Session, Model: BaseModel, filter_by: dict, values: dict
+    ) -> BaseModel:
         try:
-            value_id = values.pop("id")
-            args = cls.to_snake_case([values])
+            obj = session.query(Model).filter_by(**filter_by).one()
 
-            stmt = (
-                update(Model).where(Model.id == value_id).values(*args).returning(Model)
-            )
-
-            result = session.execute(stmt).scalars().all()
+            for key, value in values.items():
+                setattr(obj, key, value)
 
             if not cls.single_transaction:
                 session.commit()
 
-            return result
+            return obj
 
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
@@ -243,14 +241,12 @@ class PGUtils:
         for record in records:
             cls.insert_orm(session, model, record)
 
-    def delete_orm(cls, session: Session, model: Any, records: List[uuid.UUID]) -> bool:
+    def delete_orm(cls, session: Session, record: BaseModel) -> bool:
         try:
-            session.query(model).filter(model.uuid.in_(records)).delete(
-                synchronize_session=False
-            )
+            session.delete(record)
             if not cls.single_transaction:
                 session.commit()
-            cls.logger.info(f"Deleted {len(records)} records")
+            cls.logger.info(f"Deleted record {record.id}")
             return True
         except DBAPIError as e:
             if not cls.single_transaction:
