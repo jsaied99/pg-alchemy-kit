@@ -137,8 +137,8 @@ class PGUtils:
         except DBAPIError as e:
             raise e
 
-    @deprecated
-    def update_orm(
+    # @deprecated
+    def update(
         cls, session: Session, model: Any, key_value: dict, update_values: dict
     ) -> Union[bool, None]:
         """This method is deprecated. Use update() instead."""
@@ -150,15 +150,17 @@ class PGUtils:
                 f"UPDATE {model().table_name()} SET {update_stmt} WHERE {key} = :{key}"
             )
             session.execute(stmt, {**key_value, **update_values})
+
             if not cls.single_transaction:
                 session.commit()
             return True
         except DBAPIError as e:
             cls.logger.info(f"Error in update: {e}")
-            session.rollback()
+            if not cls.single_transaction:
+                session.rollback()
             raise e
 
-    def update(
+    def update_orm(
         cls, session: Session, Model: BaseModel, filter_by: dict, values: dict
     ) -> BaseModel:
         try:
