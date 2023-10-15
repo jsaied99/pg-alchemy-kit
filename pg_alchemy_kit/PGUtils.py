@@ -75,11 +75,15 @@ class PGUtils:
         cls, session: Session, stmt: Select, **kwargs
     ) -> Union[List[dict], None]:
         try:
+            convert_to_dict = kwargs.get("convert_to_dict", False)
             results = session.execute(stmt).scalars().all()
             if results is None:
                 return []
+            if convert_to_dict:
+                return [record.to_dict() for record in results]
 
-            return [record.to_dict() for record in results]
+            return results
+
         except DBAPIError as e:
             raise e
 
