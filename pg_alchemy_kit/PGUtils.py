@@ -248,7 +248,6 @@ class PGUtils:
             session.delete(record)
             if not cls.single_transaction:
                 session.commit()
-            cls.logger.info(f"Deleted record {record.id}")
             return True
         except DBAPIError as e:
             if not cls.single_transaction:
