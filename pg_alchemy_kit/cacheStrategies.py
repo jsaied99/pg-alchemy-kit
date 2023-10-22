@@ -72,7 +72,7 @@ class InMemoryCacheStrategy:
             raw_data = None
 
     def select(self, session: Session, statement: Select, *multiparams, **params):
-        cache_key = self.create_cache_key(statement)
+        cache_key = self.create_cache_key(session, statement)
         raw_data = self.get_key(cache_key)
 
         self.check_expired(raw_data, cache_key)
@@ -103,7 +103,7 @@ class InMemoryCacheStrategy:
             .all()
         )
 
-    def create_cache_key(self, statement: Select) -> str:
+    def create_cache_key(self, session: Session, statement: Select) -> str:
         sql = self.get_sql_stmt(statement)
         main_table_name = statement.froms[0]
         return f"{main_table_name}:{sql}"
