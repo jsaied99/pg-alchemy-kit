@@ -70,8 +70,8 @@ class InMemoryCacheStrategy:
             return [from_clause.name]
 
         elif isinstance(from_clause, _ORMJoin):
-            left_names = self.extract_table_name(from_clause.left)
-            right_names = self.extract_table_name(from_clause.right)
+            left_names = self._extract_table_name(from_clause.left)
+            right_names = self._extract_table_name(from_clause.right)
             return left_names + right_names
 
         return []
