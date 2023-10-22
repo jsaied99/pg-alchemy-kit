@@ -1,6 +1,6 @@
 import pickle
 from sqlalchemy.orm import Session
-from sqlalchemy import Select
+from sqlalchemy import Select, Insert
 from sqlalchemy.dialects import postgresql
 import time
 import datetime
@@ -30,10 +30,15 @@ class CachingSession(Session):
         )
         super().__init__(**options)
 
+    def add(self, instance: object, _warn: bool = True) -> None:
+        self.cache_strategy.add(self, instance, _warn=_warn)
+
     def execute(self, statement, *multiparams, **params):
         if isinstance(statement, Select):
             try:
-                return self.cache_strategy.exec(self, statement, *multiparams, **params)
+                return self.cache_strategy.select(
+                    self, statement, *multiparams, **params
+                )
             except CacheMissError:
                 pass
 
@@ -66,7 +71,7 @@ class InMemoryCacheStrategy:
             del self.cache[cache_key]
             raw_data = None
 
-    def exec(self, session: Session, statement: Select, *multiparams, **params):
+    def select(self, session: Session, statement: Select, *multiparams, **params):
         cache_key = self.create_cache_key(statement)
         raw_data = self.get_key(cache_key)
 
@@ -80,6 +85,16 @@ class InMemoryCacheStrategy:
 
         return CachedResult(result)
 
+    def clear_cache_for_table(self, table_name: str):
+        cache_keys = list(filter(lambda x: x.startswith(table_name), self.cache.keys()))
+
+        for cache_key in cache_keys:
+            del self.cache[cache_key]
+
+    def add(self, session: Session, instance: object, _warn: bool = True) -> None:
+        self.clear_cache_for_table(instance.__table__.name)
+        super(CachingSession, session).add(instance, _warn=_warn)
+
     def __execute(self, session: Session, statement: Select, *multiparams, **params):
         return (
             super(CachingSession, session)
@@ -89,7 +104,9 @@ class InMemoryCacheStrategy:
         )
 
     def create_cache_key(self, statement: Select) -> str:
-        return self.get_sql_stmt(statement)
+        sql = self.get_sql_stmt(statement)
+        main_table_name = statement.froms[0]
+        return f"{main_table_name}:{sql}"
 
     def get_sql_stmt(self, statement: Select) -> str:
         "Use the statement's SQL and parameters as the cache key"
