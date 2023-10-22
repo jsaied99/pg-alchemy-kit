@@ -10,6 +10,8 @@ import logging
 from contextlib import contextmanager
 from typing import List, Iterator
 
+from sqlalchemy import orm
+
 
 class PG:
     def initialize(
@@ -19,10 +21,12 @@ class PG:
         single_transaction: bool = False,
         **kwargs,
     ):
+        session_maker_kwargs = kwargs.pop("session_maker_kwargs", {})
+
         url = url or get_engine_url()
         cls.engine: Engine = get_engine(url, **kwargs)
         cls.SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=cls.engine
+            autocommit=False, autoflush=False, bind=cls.engine, **session_maker_kwargs
         )
         cls.inspector = inspect(cls.engine)
         cls.logger = logger
@@ -49,13 +53,14 @@ class PG:
         if type(schemas) != list:
             schemas = [schemas]
 
-        for Base, schema in zip(Bases, schemas):
-            try:
-                if schema not in cls.inspector.get_schema_names():
-                    cls.engine.execute(sqlalchemy.schema.CreateSchema(schema))
-                Base.metadata.create_all(cls.engine)
-            except Exception as e:
-                cls.logger.info(f"Error in create_tables: {e}")
+        with cls.engine.begin() as conn:
+            for Base, schema in zip(Bases, schemas):
+                try:
+                    if schema not in cls.inspector.get_schema_names():
+                        conn.execute(sqlalchemy.schema.CreateSchema(schema))
+                    Base.metadata.create_all(cls.engine)
+                except Exception as e:
+                    cls.logger.info(f"Error in create_tables: {e}")
 
     @contextmanager
     def get_session_ctx(cls) -> Iterator[Session]:

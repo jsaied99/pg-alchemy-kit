@@ -2,7 +2,6 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm.session import Session
 from sqlalchemy import create_engine, text, Select
 from sqlalchemy.engine.base import Engine
-from sqlalchemy import update
 from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
 
