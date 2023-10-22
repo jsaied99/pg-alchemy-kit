@@ -4,6 +4,7 @@ from sqlalchemy import Select, Insert
 from sqlalchemy.dialects import postgresql
 import time
 import datetime
+import sqlalchemy
 
 MINUTE = 10
 
@@ -61,6 +62,22 @@ class InMemoryCacheStrategy:
     def load_data(self, raw_data) -> any:
         return pickle.loads(raw_data)
 
+    def _extract_table_name(self, from_clause):
+        """Extract table name(s) from a SQLAlchemy clause (table or join)."""
+
+        if hasattr(from_clause, "name"):
+            return [from_clause.name]
+
+        elif isinstance(from_clause, sqlalchemy.orm.util._ORMJoin):
+            left_names = self.extract_table_name(from_clause.left)
+            right_names = self.extract_table_name(from_clause.right)
+            return left_names + right_names
+
+        return []
+
+    def extract_table_name(self, statement: Select) -> str:
+        return self._extract_table_name(statement.froms[0])[0]
+
     def check_expired(self, raw_data: any, cache_key: str) -> bool:
         if (
             raw_data
@@ -104,9 +121,7 @@ class InMemoryCacheStrategy:
         )
 
     def generate_cache_key(self, session: Session, statement: Select) -> str:
-        sql = self.get_sql_stmt(statement)
-        main_table_name = statement.froms[0]
-        return f"{main_table_name}:{sql}"
+        return f"{self.extract_table_name(statement)}:{self.get_sql_stmt(statement)}"
 
     def get_sql_stmt(self, statement: Select) -> str:
         "Use the statement's SQL and parameters as the cache key"
