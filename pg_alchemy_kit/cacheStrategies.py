@@ -5,6 +5,7 @@ from sqlalchemy.dialects import postgresql
 import time
 import datetime
 import sqlalchemy
+from sqlalchemy.orm.util import _ORMJoin
 
 MINUTE = 10
 
@@ -68,7 +69,7 @@ class InMemoryCacheStrategy:
         if hasattr(from_clause, "name"):
             return [from_clause.name]
 
-        elif isinstance(from_clause, sqlalchemy.orm.util._ORMJoin):
+        elif isinstance(from_clause, _ORMJoin):
             left_names = self.extract_table_name(from_clause.left)
             right_names = self.extract_table_name(from_clause.right)
             return left_names + right_names
