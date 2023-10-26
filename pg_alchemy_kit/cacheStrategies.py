@@ -1,11 +1,11 @@
+import datetime
 import pickle
 from sqlalchemy.orm import Session
 from sqlalchemy import Select, Insert
 from sqlalchemy.dialects import postgresql
-import time
-import datetime
-import sqlalchemy
 from sqlalchemy.orm.util import _ORMJoin
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+
 
 MINUTE = 10
 
@@ -17,12 +17,43 @@ class CacheMissError(Exception):
 class CachedResult:
     def __init__(self, data):
         self._data = data
+        self._attributes = {}
+
+    def all(self):
+        return self._data
+
+    def first(self):
+        return self._data[0] if self._data else None
+
+    def one(self):
+        if len(self._data) == 1:
+            return self._data[0]
+        elif len(self._data) == 0:
+            raise NoResultFound("No result found.")
+        else:
+            raise MultipleResultsFound("Multiple results found.")
+
+    def scalar(self):
+        result = self.one()
+        return result[0] if result else None
 
     def scalars(self):
         return self
 
-    def all(self):
-        return self._data
+    def one_or_none(self):
+        try:
+            return self.one()
+        except MultipleResultsFound:
+            raise
+        except NoResultFound:
+            return None
+
+    def unique(self):
+        if len(self._data) == 0:
+            raise NoResultFound("No result found.")
+        elif len(self._data) > 1:
+            raise MultipleResultsFound("Multiple results found.")
+        return self._data[0]
 
 
 class CachingSession(Session):
