@@ -66,6 +66,9 @@ class CachingSession(Session):
     def add(self, instance: object, _warn: bool = True) -> None:
         self.cache_strategy.add(self, instance, _warn=_warn)
 
+    def delete(self, instance: object) -> None:
+        return self.cache_strategy.delete(self, instance)
+
     def execute(self, statement, *multiparams, **params):
         if isinstance(statement, Select):
             try:
@@ -134,15 +137,19 @@ class InMemoryCacheStrategy:
 
         return CachedResult(result)
 
+    def add(self, session: Session, instance: object, _warn: bool = True) -> None:
+        self.clear_cache_for_table(session, instance.__table__.name)
+        super(CachingSession, session).add(instance, _warn=_warn)
+
+    def delete(self, session: Session, instance: object) -> None:
+        self.clear_cache_for_table(session, instance.__table__.name)
+        return super(CachingSession, session).delete(instance)
+
     def clear_cache_for_table(self, session: Session, table_name: str):
         cache_keys = list(filter(lambda x: x.startswith(table_name), self.cache.keys()))
 
         for cache_key in cache_keys:
             del self.cache[cache_key]
-
-    def add(self, session: Session, instance: object, _warn: bool = True) -> None:
-        self.clear_cache_for_table(session, instance.__table__.name)
-        super(CachingSession, session).add(instance, _warn=_warn)
 
     def __execute(self, session: Session, statement: Select, *multiparams, **params):
         return (
