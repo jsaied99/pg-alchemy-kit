@@ -22,6 +22,12 @@ class CachedResult:
     def all(self):
         return self._data
 
+    def fetchall(self):
+        return self._data
+
+    def fetchone(self):
+        return self._data[0] if self._data else None
+
     def first(self):
         return self._data[0] if self._data else None
 
