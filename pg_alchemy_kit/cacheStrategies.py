@@ -16,8 +16,11 @@ class CacheMissError(Exception):
 
 class CachedResult:
     def __init__(self, data):
-        self._data = data
+        self._data = self._format_data(data)
         self._attributes = {}
+
+    def _format_data(self, data):
+        return [v for d in data for v in d.values()]
 
     def all(self):
         return self._data
@@ -161,7 +164,10 @@ class InMemoryCacheStrategy:
         return (
             super(CachingSession, session)
             .execute(statement, *multiparams, **params)
-            .scalars()
+            # .scalars()
+            # .all()
+            # .fetchall()
+            .mappings()
             .all()
         )
 
