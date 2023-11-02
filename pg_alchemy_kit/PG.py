@@ -66,6 +66,7 @@ class PG:
     def get_session_ctx(cls) -> Iterator[Session]:
         with cls.SessionLocal() as session:
             try:
+                cls.utils.initialize(session)
                 yield session
             finally:
                 session.close()
@@ -74,6 +75,7 @@ class PG:
     def transaction(cls) -> Iterator[Session]:
         with cls.SessionLocal() as session:
             try:
+                cls.utils.initialize(session)
                 yield session
                 session.commit()
             except Exception as e:
@@ -85,7 +87,20 @@ class PG:
     def get_session(cls) -> Iterator[Session]:
         with cls.SessionLocal() as session:
             try:
+                cls.utils.initialize(session)
                 yield session
+            finally:
+                session.close()
+
+    def get_transactional_session(cls) -> Iterator[Session]:
+        with cls.SessionLocal() as session:
+            try:
+                cls.utils.initialize(session)
+                yield session
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                raise e
             finally:
                 session.close()
 
