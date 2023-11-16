@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pg-alchemy-kit"
-version = "0.5.2"
+version = "0.5.3"
 description = "A simple wrapper around sqlalchemy to make it easier to use with postgresql"
 authors = ["jsaied99 <jsaied99@gmail.com>"]
 readme = "README.md"

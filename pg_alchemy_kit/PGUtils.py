@@ -6,7 +6,7 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
 
 import logging
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 import uuid
 import os
 import warnings
@@ -88,6 +88,30 @@ class PGUtils:
 
         except DBAPIError as e:
             raise e
+
+    def select_orm_one(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[dict, None]:
+        try:
+            convert_to_dict = kwargs.get("convert_to_dict", False)
+            results: BaseModel = session.execute(stmt).scalars().one()
+            if results is None:
+                return {}
+            if convert_to_dict:
+                return results.to_dict()
+
+            return results
+
+        except DBAPIError as e:
+            raise e
+
+    def select_orm_one_strict(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[BaseModel, Exception]:
+        result: Optional[BaseModel] = session.execute(stmt).scalars().one()
+        if result is None:
+            raise Exception("No records found")
+        return result
 
     def insert(cls, session: Session, sql: str, params: dict) -> Union[bool, None]:
         try:
