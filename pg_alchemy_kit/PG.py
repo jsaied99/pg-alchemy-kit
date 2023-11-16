@@ -21,6 +21,7 @@ class PG:
         single_transaction: bool = False,
         **kwargs,
     ):
+        pg_utils_kwargs = kwargs.pop("pg_utils_kwargs", {})
         session_maker_kwargs = kwargs.pop("session_maker_kwargs", {})
 
         url = url or get_engine_url()
@@ -37,7 +38,7 @@ class PG:
             logger.addHandler(logging.StreamHandler())
             cls.logger = logger
 
-        cls.utils = PGUtils(cls.logger, single_transaction)
+        cls.utils = PGUtils(cls.logger, single_transaction, **pg_utils_kwargs)
 
         cls.logger.info("Initialized PG")
 
