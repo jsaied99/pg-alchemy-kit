@@ -38,10 +38,13 @@ class BaseModel:
 
 
 class PGUtils:
-    def __init__(cls, logger: logging.Logger, single_transaction: bool = False):
+    def __init__(
+        cls, logger: logging.Logger, single_transaction: bool = False, **kwargs
+    ):
         cls.session = None
         cls.logger = logger
         cls.single_transaction = single_transaction
+        cls.snake_case = kwargs.get("snake_case", False)
 
     def initialize(cls, session: Session):
         cls.session = session
@@ -160,10 +163,14 @@ class PGUtils:
             raise e
 
     def update_orm(
-        cls, session: Session, Model: BaseModel, filter_by: dict, values: dict
+        cls, session: Session, Model: BaseModel, filter_by: dict, values: dict, **kwargs
     ) -> BaseModel:
         try:
             obj = session.query(Model).filter_by(**filter_by).one()
+            to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
+
+            if to_snake_case:
+                values = cls.to_snake_case([values])[0]
 
             for key, value in values.items():
                 setattr(obj, key, value)
@@ -197,7 +204,7 @@ class PGUtils:
         cls, session: Session, model, record: dict, **kwargs
     ) -> Union[object, None]:
         try:
-            to_snake_case = kwargs.get("to_snake_case", False)
+            to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
 
             if to_snake_case:
                 record = cls.to_snake_case([record])[0]
