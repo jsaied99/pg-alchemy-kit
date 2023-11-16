@@ -113,6 +113,15 @@ class PGUtils:
             raise Exception("No records found")
         return result
 
+    def check_exists_orm(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[bool, Exception]:
+        try:
+            result: Optional[BaseModel] = session.execute(stmt).scalars().one()
+            return result is not None
+        except DBAPIError as e:
+            raise e
+
     def insert(cls, session: Session, sql: str, params: dict) -> Union[bool, None]:
         try:
             stmt: text = text(sql)
