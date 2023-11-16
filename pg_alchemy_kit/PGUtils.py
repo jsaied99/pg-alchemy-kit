@@ -117,8 +117,12 @@ class PGUtils:
         cls, session: Session, stmt: Select, **kwargs
     ) -> Union[bool, Exception]:
         try:
-            result: Optional[BaseModel] = session.execute(stmt).scalars().one()
-            return result is not None
+            result: Optional[BaseModel] = session.execute(stmt).scalars().all()
+
+            if result is None:
+                return False
+            return len(result) > 0
+
         except DBAPIError as e:
             raise e
 
