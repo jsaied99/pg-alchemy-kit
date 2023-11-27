@@ -1,9 +1,12 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import Select
 
 import logging
-from typing import List
+import uuid
+from typing import Any, List, Optional, Union
+from abc import ABC, abstractmethod
 
 
 class BaseModel:
@@ -19,7 +22,7 @@ class BaseModel:
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-class PGUtilsBase:
+class PGUtilsBase(ABC):
     def __init__(
         cls, logger: logging.Logger, single_transaction: bool = False, **kwargs
     ):
@@ -30,6 +33,70 @@ class PGUtilsBase:
 
     def initialize(cls, session: Session):
         cls.session = session
+
+    @abstractmethod
+    def select(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[List[dict], None]:
+        pass
+
+    @abstractmethod
+    def select_one(cls, session: Session, stmt: Select, **kwargs) -> Union[dict, None]:
+        pass
+
+    @abstractmethod
+    def select_one_strict(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[BaseModel, Exception]:
+        pass
+
+    @abstractmethod
+    def check_exists(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[bool, Exception]:
+        pass
+
+    @abstractmethod
+    def execute(cls, session: Session, stmt: Select) -> Union[bool, None]:
+        pass
+
+    @abstractmethod
+    def update(
+        cls, session: Session, Model: BaseModel, filter_by: dict, values: dict, **kwargs
+    ) -> BaseModel:
+        pass
+
+    @abstractmethod
+    def bulk_update(
+        cls, session: Session, model: Any, records: List[dict]
+    ) -> Union[bool, None]:
+        pass
+
+    @abstractmethod
+    def insert(
+        cls, session: Session, model, record: dict, **kwargs
+    ) -> Union[object, None]:
+        pass
+
+    @abstractmethod
+    def bulk_insert(
+        cls, session: Session, model: Any, records: List[dict], **kwargs
+    ) -> List[dict]:
+        pass
+
+    @abstractmethod
+    def insert_on_conflict(cls, session: Session, model: Any, records: List[dict]):
+        pass
+
+    @abstractmethod
+    def delete(cls, session: Session, record: BaseModel) -> bool:
+        pass
+
+    @abstractmethod
+    def delete_by_id(
+        cls, session: Session, model: Any, record_id: Union[int, uuid.UUID]
+    ) -> bool:
+        pass
 
     @staticmethod
     def __to_snake_case(camel_str: str) -> str:

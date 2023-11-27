@@ -41,7 +41,9 @@ class PG:
             logger.addHandler(logging.StreamHandler())
             cls.logger = logger
 
-        cls.utils = pgUtils(cls.logger, single_transaction, **pg_utils_kwargs)
+        cls.utils: PGUtilsBase = pgUtils(
+            cls.logger, single_transaction, **pg_utils_kwargs
+        )
 
         cls.logger.info("Initialized PG")
 
