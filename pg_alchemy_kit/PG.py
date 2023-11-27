@@ -1,4 +1,6 @@
 from pg_alchemy_kit.PGUtils import PGUtils, get_engine, get_engine_url
+from pg_alchemy_kit.PGUtilsORM import PGUtilsORM
+from pg_alchemy_kit.PGUtilsBase import PGUtilsBase
 
 from sqlalchemy.orm.session import Session
 from sqlalchemy import inspect
@@ -19,6 +21,7 @@ class PG:
         url: str = None,
         logger: logging.Logger = None,
         single_transaction: bool = False,
+        pgUtils: PGUtilsBase = PGUtils,
         **kwargs,
     ):
         pg_utils_kwargs = kwargs.pop("pg_utils_kwargs", {})
@@ -38,7 +41,7 @@ class PG:
             logger.addHandler(logging.StreamHandler())
             cls.logger = logger
 
-        cls.utils = PGUtils(cls.logger, single_transaction, **pg_utils_kwargs)
+        cls.utils = pgUtils(cls.logger, single_transaction, **pg_utils_kwargs)
 
         cls.logger.info("Initialized PG")
 
