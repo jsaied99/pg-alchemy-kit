@@ -171,8 +171,8 @@ class PGUtilsORM(PGUtilsBase):
     ) -> bool:
         try:
             stmt = select(model).where(model.id == record_id)
-            record: BaseModel = cls.select_orm_one_strict(session, stmt)
-            return cls.delete_orm(session, record)
+            record: BaseModel = cls.select_one_strict(session, stmt)
+            return cls.delete(session, record)
         except DBAPIError as e:
             cls.logger.info(f"Error in remove_records_sync: {e}")
             return False
