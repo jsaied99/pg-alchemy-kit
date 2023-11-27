@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, text, Select
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import select
 
 import logging
 from typing import Any, List, Optional, Union
@@ -295,6 +296,17 @@ class PGUtils:
         except DBAPIError as e:
             if not cls.single_transaction:
                 session.rollback()
+            cls.logger.info(f"Error in remove_records_sync: {e}")
+            return False
+
+    def delete_orm_by_id(
+        cls, session: Session, model: Any, record_id: Union[int, uuid.UUID]
+    ) -> bool:
+        try:
+            stmt = select(model).where(model.id == record_id)
+            record: BaseModel = cls.select_orm_one_strict(session, stmt)
+            return cls.delete_orm(session, record)
+        except DBAPIError as e:
             cls.logger.info(f"Error in remove_records_sync: {e}")
             return False
 
