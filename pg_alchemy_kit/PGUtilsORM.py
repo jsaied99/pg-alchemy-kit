@@ -12,7 +12,7 @@ from pg_alchemy_kit.PGUtilsBase import PGUtilsBase, BaseModel
 class PGUtilsORM(PGUtilsBase):
     def select(
         cls, session: Session, stmt: Select, **kwargs
-    ) -> Union[List[dict], None]:
+    ) -> Union[List[BaseModel], List[dict], Exception]:
         try:
             convert_to_dict = kwargs.get("convert_to_dict", False)
             results = session.execute(stmt).scalars().all()
@@ -26,7 +26,9 @@ class PGUtilsORM(PGUtilsBase):
         except DBAPIError as e:
             raise e
 
-    def select_one(cls, session: Session, stmt: Select, **kwargs) -> Union[dict, None]:
+    def select_one(
+        cls, session: Session, stmt: Select, **kwargs
+    ) -> Union[BaseModel, dict, Exception]:
         try:
             convert_to_dict = kwargs.get("convert_to_dict", False)
             results: BaseModel = session.execute(stmt).scalars().one()
@@ -61,7 +63,7 @@ class PGUtilsORM(PGUtilsBase):
         except DBAPIError as e:
             raise e
 
-    def execute(cls, session: Session, stmt: Select) -> Union[bool, None]:
+    def execute(cls, session: Session, stmt: Select) -> Union[bool, Exception]:
         try:
             return session.execute(stmt).fetchall()
         except DBAPIError as e:
@@ -69,7 +71,7 @@ class PGUtilsORM(PGUtilsBase):
 
     def update(
         cls, session: Session, Model: BaseModel, filter_by: dict, values: dict, **kwargs
-    ) -> BaseModel:
+    ) -> Union[BaseModel, Exception]:
         try:
             obj = session.query(Model).filter_by(**filter_by).one()
             to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
@@ -107,7 +109,7 @@ class PGUtilsORM(PGUtilsBase):
 
     def insert(
         cls, session: Session, model, record: dict, **kwargs
-    ) -> Union[object, None]:
+    ) -> Union[BaseModel, Exception]:
         try:
             to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
 
@@ -124,7 +126,7 @@ class PGUtilsORM(PGUtilsBase):
         except DBAPIError as e:
             cls.logger.info(f"Error in add_record_sync: {e}")
             session.rollback()
-            return None
+            raise e
 
     def bulk_insert(
         cls, session: Session, model: Any, records: List[dict], **kwargs
@@ -154,7 +156,7 @@ class PGUtilsORM(PGUtilsBase):
         for record in records:
             cls.insert(session, model, record)
 
-    def delete(cls, session: Session, record: BaseModel) -> bool:
+    def delete(cls, session: Session, record: BaseModel) -> Union[bool, Exception]:
         try:
             session.delete(record)
             if not cls.single_transaction:
@@ -164,15 +166,15 @@ class PGUtilsORM(PGUtilsBase):
             if not cls.single_transaction:
                 session.rollback()
             cls.logger.info(f"Error in remove_records_sync: {e}")
-            return False
+            raise e
 
     def delete_by_id(
         cls, session: Session, model: Any, record_id: Union[int, uuid.UUID]
-    ) -> bool:
+    ) -> Union[bool, Exception]:
         try:
             stmt = select(model).where(model.id == record_id)
             record: BaseModel = cls.select_one_strict(session, stmt)
             return cls.delete(session, record)
         except DBAPIError as e:
             cls.logger.info(f"Error in remove_records_sync: {e}")
-            return False
+            raise e
