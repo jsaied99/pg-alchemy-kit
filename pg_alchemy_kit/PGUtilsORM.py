@@ -10,20 +10,12 @@ from pg_alchemy_kit.PGUtilsBase import PGUtilsBase, BaseModel
 
 
 class PGUtilsORM(PGUtilsBase):
-    def handle_db_error(self, session: Session, error: Exception, action: str):
-        """Handles database errors by logging and rolling back the session if needed."""
-        self.logger.error(f"Error in {action}: {error}")
-        if not self.single_transaction:
-            session.rollback()
-        raise error
-
     def select(
-        self, session: Session, stmt: Select, **kwargs
+        cls, session: Session, stmt: Select, **kwargs
     ) -> Union[List[dict], None]:
-        """Executes a select statement and returns a list of results or None."""
         try:
             convert_to_dict = kwargs.get("convert_to_dict", False)
-            results: List[BaseModel] = session.execute(stmt).scalars().all()
+            results = session.execute(stmt).scalars().all()
             if results is None:
                 return []
             if convert_to_dict:
@@ -32,12 +24,9 @@ class PGUtilsORM(PGUtilsBase):
             return results
 
         except DBAPIError as e:
-            self.handle_db_error(session, e, "select")
+            raise e
 
-    def select_one(
-        self, session: Session, stmt: Select, **kwargs
-    ) -> Union[BaseModel, dict]:
-        """Executes a select statement and returns a single result or None."""
+    def select_one(cls, session: Session, stmt: Select, **kwargs) -> Union[dict, None]:
         try:
             convert_to_dict = kwargs.get("convert_to_dict", False)
             results: BaseModel = session.execute(stmt).scalars().one()
@@ -49,21 +38,19 @@ class PGUtilsORM(PGUtilsBase):
             return results
 
         except DBAPIError as e:
-            self.handle_db_error(session, e, "select_one")
+            raise e
 
     def select_one_strict(
-        self, session: Session, stmt: Select, **kwargs
+        cls, session: Session, stmt: Select, **kwargs
     ) -> Union[BaseModel, Exception]:
-        """Executes a select statement and returns a single result or raises an exception."""
-        result: Optional[BaseModel] = self.select_one(session, stmt, **kwargs)
-        if result is None or result == {}:
+        result: Optional[BaseModel] = session.execute(stmt).scalars().one()
+        if result is None:
             raise Exception("No records found")
         return result
 
     def check_exists(
-        self, session: Session, stmt: Select, **kwargs
+        cls, session: Session, stmt: Select, **kwargs
     ) -> Union[bool, Exception]:
-        """Executes a select statement and returns a boolean indicating if a record exists."""
         try:
             result: Optional[BaseModel] = session.execute(stmt).scalars().all()
 
@@ -72,119 +59,120 @@ class PGUtilsORM(PGUtilsBase):
             return len(result) > 0
 
         except DBAPIError as e:
-            self.handle_db_error(session, e, "check_exists")
+            raise e
 
-    def execute(self, session: Session, stmt: Select) -> Union[bool, None]:
-        """Executes a select statement and returns a boolean indicating if a record exists."""
+    def execute(cls, session: Session, stmt: Select) -> Union[bool, None]:
         try:
             return session.execute(stmt).fetchall()
         except DBAPIError as e:
-            self.handle_db_error(session, e, "execute")
+            raise e
 
     def update(
-        self,
-        session: Session,
-        Model: BaseModel,
-        filter_by: dict,
-        values: dict,
-        **kwargs,
+        cls, session: Session, Model: BaseModel, filter_by: dict, values: dict, **kwargs
     ) -> BaseModel:
-        """Updates a record and returns the updated record."""
         try:
-            update_kwargs = kwargs.get("update_kwargs", {})
-
-            stmt = select(Model).with_for_update(**update_kwargs).filter_by(**filter_by)
-            obj: BaseModel = self.select_one_strict(session, stmt)
-
-            to_snake_case = kwargs.get("to_snake_case", self.snake_case)
+            obj = session.query(Model).filter_by(**filter_by).one()
+            to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
 
             if to_snake_case:
-                values = self.to_snake_case([values])[0]
+                values = cls.to_snake_case([values])[0]
 
             for key, value in values.items():
                 setattr(obj, key, value)
 
-            if not self.single_transaction:
+            if not cls.single_transaction:
                 session.commit()
 
             return obj
 
         except DBAPIError as e:
-            self.handle_db_error(session, e, "update")
+            cls.logger.info(f"Error in update: {e}")
+            if not cls.single_transaction:
+                session.rollback()
+            raise e
 
     def bulk_update(
-        self, session: Session, model: Any, records: List[dict]
+        cls, session: Session, model: Any, records: List[dict]
     ) -> Union[bool, None]:
-        """Updates a record and returns the updated record."""
         try:
             session.bulk_update_mappings(model, records)
-            if not self.single_transaction:
+            if not cls.single_transaction:
                 session.commit()
             return True
         except DBAPIError as e:
-            self.handle_db_error(session, e, "bulk_update")
+            cls.logger.info(f"Error in bulk_update: {e}")
+            if not cls.single_transaction:
+                session.rollback()
+            raise e
 
     def insert(
-        self, session: Session, model, record: dict, **kwargs
+        cls, session: Session, model, record: dict, **kwargs
     ) -> Union[object, None]:
-        """Inserts a record and returns the inserted record."""
         try:
-            to_snake_case = kwargs.get("to_snake_case", self.snake_case)
+            to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
 
             if to_snake_case:
-                record = self.to_snake_case([record])[0]
+                record = cls.to_snake_case([record])[0]
 
             obj = model(**record)
             session.add(obj)
-            if not self.single_transaction:
+            if not cls.single_transaction:
                 session.commit()
             else:
                 session.flush()
             return obj
         except DBAPIError as e:
-            self.handle_db_error(session, e, "insert")
+            cls.logger.info(f"Error in add_record_sync: {e}")
+            session.rollback()
+            return None
 
     def bulk_insert(
-        self, session: Session, model: Any, records: List[dict], **kwargs
+        cls, session: Session, model: Any, records: List[dict], **kwargs
     ) -> List[dict]:
         try:
-            records_to_insert: List[BaseModel] = [model(**record) for record in records]
+            records_to_insert: List[dict] = [model(**record) for record in records]
 
             session.add_all(records_to_insert)
             session.flush()  # Flush the records to obtain their IDs
             records: dict = [record.to_dict() for record in records_to_insert]
 
-            if not self.single_transaction:
+            if not cls.single_transaction:
                 session.commit()
 
             return records
         except DBAPIError as e:
-            self.handle_db_error(session, e, "bulk_insert")
+            cls.session.rollback()
+            cls.logger.info(f"Error in add_records_sync: {e}")
+            return []
 
     def insert_on_conflict(
-        self,
+        cls,
         session: Session,
         model: Any,
         records: List[dict],
     ):
         for record in records:
-            self.insert(session, model, record)
+            cls.insert(session, model, record)
 
-    def delete(self, session: Session, record: BaseModel) -> bool:
+    def delete(cls, session: Session, record: BaseModel) -> bool:
         try:
             session.delete(record)
-            if not self.single_transaction:
+            if not cls.single_transaction:
                 session.commit()
             return True
         except DBAPIError as e:
-            self.handle_db_error(session, e, "delete")
+            if not cls.single_transaction:
+                session.rollback()
+            cls.logger.info(f"Error in remove_records_sync: {e}")
+            return False
 
     def delete_by_id(
-        self, session: Session, model: Any, record_id: Union[int, uuid.UUID]
+        cls, session: Session, model: Any, record_id: Union[int, uuid.UUID]
     ) -> bool:
         try:
             stmt = select(model).where(model.id == record_id)
-            record: BaseModel = self.select_one_strict(session, stmt)
-            return self.delete(session, record)
+            record: BaseModel = cls.select_one_strict(session, stmt)
+            return cls.delete(session, record)
         except DBAPIError as e:
-            self.handle_db_error(session, e, "delete_by_id")
+            cls.logger.info(f"Error in remove_records_sync: {e}")
+            return False
