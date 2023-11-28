@@ -12,12 +12,10 @@ import logging
 from contextlib import contextmanager
 from typing import List, Iterator
 
-from sqlalchemy import orm
-
 
 class PG:
     def initialize(
-        cls,
+        self,
         url: str = None,
         logger: logging.Logger = None,
         single_transaction: bool = False,
@@ -28,27 +26,27 @@ class PG:
         session_maker_kwargs = kwargs.pop("session_maker_kwargs", {})
 
         url = url or get_engine_url()
-        cls.engine: Engine = get_engine(url, **kwargs)
-        cls.SessionLocal = sessionmaker(
-            autocommit=False, autoflush=False, bind=cls.engine, **session_maker_kwargs
+        self.engine: Engine = get_engine(url, **kwargs)
+        self.SessionLocal = sessionmaker(
+            autocommit=False, autoflush=False, bind=self.engine, **session_maker_kwargs
         )
-        cls.inspector = inspect(cls.engine)
-        cls.logger = logger
+        self.inspector = inspect(self.engine)
+        self.logger = logger
 
-        if cls.logger is None:
+        if self.logger is None:
             logger = logging.getLogger(__name__)
             logger.setLevel(logging.INFO)
             logger.addHandler(logging.StreamHandler())
-            cls.logger = logger
+            self.logger = logger
 
-        cls.utils: PGUtilsBase = pgUtils(
-            cls.logger, single_transaction, **pg_utils_kwargs
+        self.utils: PGUtilsBase = pgUtils(
+            self.logger, single_transaction, **pg_utils_kwargs
         )
 
-        cls.logger.info("Initialized PG")
+        self.logger.info("Initialized PG")
 
     def create_tables(
-        cls, Bases: List[DeclarativeMeta], schemas: List[str] = ["public"]
+        self, Bases: List[DeclarativeMeta], schemas: List[str] = ["public"]
     ):
         """
         Creates tables for all the models in the list of Bases
@@ -59,29 +57,29 @@ class PG:
         if type(schemas) != list:
             schemas = [schemas]
 
-        with cls.engine.begin() as conn:
+        with self.engine.begin() as conn:
             for Base, schema in zip(Bases, schemas):
                 try:
-                    if schema not in cls.inspector.get_schema_names():
+                    if schema not in self.inspector.get_schema_names():
                         conn.execute(sqlalchemy.schema.CreateSchema(schema))
-                    Base.metadata.create_all(cls.engine)
+                    Base.metadata.create_all(self.engine)
                 except Exception as e:
-                    cls.logger.info(f"Error in create_tables: {e}")
+                    self.logger.info(f"Error in create_tables: {e}")
 
     @contextmanager
-    def get_session_ctx(cls) -> Iterator[Session]:
-        with cls.SessionLocal() as session:
+    def get_session_ctx(self) -> Iterator[Session]:
+        with self.SessionLocal() as session:
             try:
-                cls.utils.initialize(session)
+                self.utils.initialize(session)
                 yield session
             finally:
                 session.close()
 
     @contextmanager
-    def transaction(cls) -> Iterator[Session]:
-        with cls.SessionLocal() as session:
+    def transaction(self) -> Iterator[Session]:
+        with self.SessionLocal() as session:
             try:
-                cls.utils.initialize(session)
+                self.utils.initialize(session)
                 yield session
                 session.commit()
             except Exception as e:
@@ -90,18 +88,18 @@ class PG:
             finally:
                 session.close()
 
-    def get_session(cls) -> Iterator[Session]:
-        with cls.SessionLocal() as session:
+    def get_session(self) -> Iterator[Session]:
+        with self.SessionLocal() as session:
             try:
-                cls.utils.initialize(session)
+                self.utils.initialize(session)
                 yield session
             finally:
                 session.close()
 
-    def get_transactional_session(cls) -> Iterator[Session]:
-        with cls.SessionLocal() as session:
+    def get_transactional_session(self) -> Iterator[Session]:
+        with self.SessionLocal() as session:
             try:
-                cls.utils.initialize(session)
+                self.utils.initialize(session)
                 yield session
                 session.commit()
             except Exception as e:
@@ -110,11 +108,11 @@ class PG:
             finally:
                 session.close()
 
-    def get_session_scoped(cls) -> scoped_session:
-        return scoped_session(cls.SessionLocal)
+    def get_session_scoped(self) -> scoped_session:
+        return scoped_session(self.SessionLocal)
 
-    def close(cls):
-        cls.engine.dispose()
+    def close(self):
+        self.engine.dispose()
 
 
 db = PG()
