@@ -1,8 +1,8 @@
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
-from sqlalchemy import Select
-
+from sqlalchemy import Select, text
+from sqlalchemy.exc import DBAPIError
 import logging
 import uuid
 from typing import Any, List, Optional, Union
@@ -33,6 +33,32 @@ class PGUtilsBase(ABC):
 
     def initialize(self, session: Session):
         self.session = session
+
+    @staticmethod
+    def wrap_to_json(stmt: Union[str, text]) -> text:
+        if type(stmt) == str:
+            stmt = stmt.replace(";", "")
+
+        return text(f"SELECT json_agg(t) FROM ({stmt}) t")
+
+    def raw_text_select(
+        cls, session: Session, sql: str, **kwargs
+    ) -> Union[List[dict], None]:
+        try:
+            params = kwargs.get("params", {})
+            to_camel_case = kwargs.get("to_camel_case", False)
+
+            stmt: text = cls.wrap_to_json(sql)
+            results = session.execute(stmt, params=params).fetchone()[0]
+            if results is None:
+                return []
+
+            if to_camel_case:
+                results = cls.results_to_camel_case(results)
+
+            return results
+        except DBAPIError as e:
+            raise e
 
     @abstractmethod
     def select(
@@ -67,7 +93,7 @@ class PGUtilsBase(ABC):
         Model: BaseModel,
         filter_by: dict,
         values: dict,
-        **kwargs
+        **kwargs,
     ) -> BaseModel:
         pass
 
