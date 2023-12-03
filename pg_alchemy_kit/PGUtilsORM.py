@@ -94,9 +94,14 @@ class PGUtilsORM(PGUtilsBase):
             raise e
 
     def bulk_update(
-        cls, session: Session, model: Any, records: List[dict]
+        cls, session: Session, model: Any, records: List[dict], **kwargs
     ) -> Union[bool, None]:
         try:
+            to_snake_case = kwargs.get("to_snake_case", cls.snake_case)
+
+            if to_snake_case:
+                records = cls.to_snake_case(records)
+
             session.bulk_update_mappings(model, records)
             if not cls.single_transaction:
                 session.commit()
