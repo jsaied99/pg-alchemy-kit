@@ -25,8 +25,8 @@ class PG:
         pg_utils_kwargs = kwargs.pop("pg_utils_kwargs", {})
         session_maker_kwargs = kwargs.pop("session_maker_kwargs", {})
 
-        url = url or get_engine_url()
-        self.engine: Engine = get_engine(url, **kwargs)
+        self.url = url or get_engine_url()
+        self.engine: Engine = get_engine(self.url, **kwargs)
         self.SessionLocal = sessionmaker(
             autocommit=False, autoflush=False, bind=self.engine, **session_maker_kwargs
         )
