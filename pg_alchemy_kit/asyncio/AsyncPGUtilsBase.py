@@ -51,7 +51,8 @@ class AsyncPGUtilsBase(ABC):
             to_camel_case = kwargs.get("to_camel_case", False)
 
             stmt: text = cls.__wrap_to_json(sql)
-            results = await session.execute(stmt, params=params).fetchone()[0]
+            results = await session.execute(stmt, params=params)
+            results = results.fetchone()[0]
             if results is None:
                 return pd.DataFrame([])
 
@@ -70,7 +71,9 @@ class AsyncPGUtilsBase(ABC):
             to_camel_case = kwargs.get("to_camel_case", False)
 
             stmt: text = cls.__wrap_to_json(sql)
-            results = await session.execute(stmt, params=params).fetchone()[0]
+            results = await session.execute(stmt, params=params)
+            results = results.fetchone()[0]
+            # results = await session.execute(stmt, params=params).fetchone()[0]
             if results is None:
                 return []
 
