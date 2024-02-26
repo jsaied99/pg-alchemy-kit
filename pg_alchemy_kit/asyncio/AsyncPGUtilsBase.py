@@ -28,13 +28,9 @@ class AsyncPGUtilsBase(ABC):
     def __init__(
         self, logger: logging.Logger, single_transaction: bool = False, **kwargs
     ):
-        self.session = None
         self.logger: logging.Logger = logger
         self.single_transaction = single_transaction
         self.snake_case = kwargs.get("snake_case", False)
-
-    def initialize(self, session: AsyncSession):
-        self.session = session
 
     @staticmethod
     def __wrap_to_json(stmt: Union[str, text]) -> text:

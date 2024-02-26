@@ -3,21 +3,25 @@ from .AsyncPGUtilsORM import AsyncPGUtilsORM
 from .AsyncPGUtilsBase import AsyncPGUtilsBase
 
 from sqlalchemy.orm.session import Session
-from sqlalchemy import inspect
-from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import DeclarativeMeta
 import sqlalchemy
 import logging
-from contextlib import asynccontextmanager, contextmanager
-from typing import AsyncGenerator, List, Iterator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
-from sqlalchemy import text
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, List
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+    AsyncEngine,
+    async_sessionmaker,
+    async_scoped_session,
+)
+from asyncio import current_task
 
 
 def get_async_engine(url, **kwargs):
-    pool_size = kwargs.get("pool_size", 5)
-    max_overflow = kwargs.get("max_overflow", 0)
-    pool_pre_ping = kwargs.get("pool_pre_ping", True)
+    pool_size = kwargs.pop("pool_size", 5)
+    max_overflow = kwargs.pop("max_overflow", 0)
+    pool_pre_ping = kwargs.pop("pool_pre_ping", True)
     return create_async_engine(
         url,
         pool_size=pool_size,
@@ -36,35 +40,35 @@ class AsyncPG:
         pgUtils: AsyncPGUtilsBase = PGUtils,
         **kwargs,
     ):
-        pg_utils_kwargs = kwargs.pop("pg_utils_kwargs", {})
-        session_maker_kwargs = kwargs.pop("session_maker_kwargs", {})
-        async_engine_kwargs = kwargs.pop("async_engine_kwargs", {})
+        async_pg_utils_kwargs: dict = kwargs.pop("async_pg_utils_kwargs", {})
+        async_session_maker_kwargs: dict = kwargs.pop("async_session_maker_kwargs", {})
+        async_engine_kwargs: dict = kwargs.pop("async_engine_kwargs", {})
 
         self.url = url or get_engine_url(connection_type="postgresql+asyncpg")
         self.engine: AsyncEngine = get_async_engine(self.url, **async_engine_kwargs)
-        self.SessionLocal = sessionmaker(
-            self.engine,
-            autoflush=False,
-            expire_on_commit=False,
+
+        autoflush = async_session_maker_kwargs.pop("autoflush", False)
+        expire_on_commit = async_session_maker_kwargs.pop("expire_on_commit", False)
+
+        self.session_factory = async_sessionmaker(
+            bind=self.engine,
             class_=AsyncSession,
-            **session_maker_kwargs,
+            autoflush=autoflush,
+            expire_on_commit=expire_on_commit,
+            **async_session_maker_kwargs,
         )
+
+        self.Session = async_scoped_session(
+            self.session_factory, scopefunc=current_task
+        )
+
         self.logger = logger
 
         if self.logger is None:
-            logger = logging.getLogger(__name__)
-            logger.setLevel(logging.INFO)
-            logger.addHandler(logging.StreamHandler())
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            for handler in logger.handlers:
-                handler.setFormatter(formatter)
-
-            self.logger = logger
+            self.logger = logging.getLogger("sqlalchemy.engine")
 
         self.utils: AsyncPGUtilsBase = pgUtils(
-            self.logger, single_transaction, **pg_utils_kwargs
+            self.logger, single_transaction, **async_pg_utils_kwargs
         )
 
         self.logger.info(f"Initialized {self.__class__.__name__}")
@@ -91,85 +95,22 @@ class AsyncPG:
                     self.logger.info(f"Error in create_tables: {e}")
 
     @asynccontextmanager
-    async def get_session_ctx(self) -> AsyncGenerator[Session, None]:
-        async with self.SessionLocal() as session:
-            try:
-                self.utils.initialize(session)
-                yield session
-            finally:
-                await session.close()
+    async def get_session_ctx(self) -> AsyncGenerator[AsyncSession, None]:
+        async with self.Session() as session:
+            yield session
 
     @asynccontextmanager
     async def transaction(self) -> AsyncGenerator[Session, None]:
-        async with self.SessionLocal() as session:
+        async with self.Session() as session:
             try:
-                self.utils.initialize(session)
                 yield session
                 await session.commit()
             except Exception as e:
                 await session.rollback()
                 raise e
-            finally:
-                await session.close()
-
-    def get_session(self) -> Iterator[Session]:
-        with self.SessionLocal() as session:
-            try:
-                self.utils.initialize(session)
-                yield session
-            finally:
-                session.close()
-
-    def get_transactional_session(self) -> Iterator[Session]:
-        with self.SessionLocal() as session:
-            try:
-                self.utils.initialize(session)
-                yield session
-                session.commit()
-            except Exception as e:
-                session.rollback()
-                raise e
-            finally:
-                session.close()
-
-    def get_session_scoped(self) -> scoped_session:
-        return scoped_session(self.SessionLocal)
 
     async def close(self):
         await self.engine.dispose()
 
 
 db = AsyncPG()
-
-
-async def main():
-    db.initialize(url="postgresql+asyncpg://postgres:postgres@localhost:25060/postgres")
-
-    # async with db.get_session_ctx() as session:
-    async with db.transaction() as session:
-        async with session.begin():
-            # result = await session.execute(text("SELECT * FROM test_table"))
-            # result = result.mappings().all()
-            # print(result)
-
-            # insert to test_table
-            #             CREATE TABLE test_table (
-            #     id SERIAL PRIMARY KEY,
-            #     name character varying,
-            #     age integer,
-            #     country_id integer NOT NULL REFERENCES country_table(id),
-            #     created_at timestamp without time zone
-            # );
-            await session.execute(
-                text(
-                    "INSERT INTO test_table (name, age, country_id, created_at) VALUES ('test', 1, 1, NOW())"
-                )
-            )
-
-    await db.close()
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
