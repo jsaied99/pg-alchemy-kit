@@ -1,11 +1,34 @@
 import uuid
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy import select, Select
 
 from typing import Any, List, Optional, Union
 
 from .AsyncPGUtilsBase import AsyncPGUtilsBase, BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class PGBaseError(Exception):
+    pass
+
+
+class PGSelectError(PGBaseError):
+    pass
+
+
+class PGNotExistsError(PGBaseError):
+    pass
+
+
+class PGInsertError(PGBaseError):
+    pass
+
+
+class PGUpdateError(PGBaseError):
+    pass
+
+
+class PGDeleteError(PGBaseError):
+    pass
 
 
 class AsyncPGUtilsORM(AsyncPGUtilsBase):
@@ -30,8 +53,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             return results
 
-        except DBAPIError as e:
-            raise e
+        except Exception as e:
+            raise PGSelectError(str(e))
 
     async def select_one(
         cls, session: AsyncSession, stmt: Select, **kwargs
@@ -50,8 +73,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             return result
 
-        except DBAPIError as e:
-            raise e
+        except Exception as e:
+            raise PGSelectError(str(e))
 
     async def select_one_strict(
         cls, session: AsyncSession, stmt: Select, **kwargs
@@ -60,7 +83,7 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
         result: Optional[BaseModel] = result.scalars().one()
 
         if result is None:
-            raise Exception("No records found")
+            raise PGNotExistsError("No records found")
         return result
 
     async def check_exists(
@@ -73,8 +96,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
                 return False
             return len(results) > 0
 
-        except DBAPIError as e:
-            raise e
+        except Exception as e:
+            raise PGNotExistsError(str(e))
 
     async def execute(
         cls, session: AsyncSession, stmt: Select
@@ -82,8 +105,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
         try:
             tmp = await session.execute(stmt)
             return tmp.fetchall()
-        except DBAPIError as e:
-            raise e
+        except Exception as e:
+            raise PGSelectError(str(e))
 
     async def update(
         cls,
@@ -111,11 +134,10 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             return obj
 
-        except DBAPIError as e:
-            cls.logger.info(f"Error in update: {e}")
+        except Exception as e:
             if not cls.single_transaction:
                 await session.rollback()
-            raise e
+            raise PGUpdateError(str(e))
 
     async def insert(
         cls, session: AsyncSession, model, record: dict, **kwargs
@@ -133,10 +155,10 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
             else:
                 await session.flush()
             return obj
-        except DBAPIError as e:
-            cls.logger.info(f"Error in add_record_sync: {e}")
-            await session.rollback()
-            raise e
+        except Exception as e:
+            if not cls.single_transaction:
+                await session.rollback()
+            raise PGInsertError(str(e))
 
     async def bulk_insert(
         cls, session: AsyncSession, model: Any, records: List[dict], **kwargs
@@ -152,26 +174,23 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
                 await session.commit()
 
             return records
-        except DBAPIError as e:
-            await session.rollback()
-            cls.logger.info(f"Error in add_records_sync: {e}")
+        except Exception:
+            if not cls.single_transaction:
+                await session.rollback()
             return []
 
     async def delete(
         cls, session: AsyncSession, record: BaseModel
     ) -> Union[bool, Exception]:
         try:
-            print("deleting record")
             await session.delete(record)
-            print("deleted record")
             if not cls.single_transaction:
                 await session.commit()
             return True
-        except DBAPIError as e:
+        except Exception as e:
             if not cls.single_transaction:
                 await session.rollback()
-            cls.logger.info(f"Error in remove_records_sync: {e}")
-            raise e
+            raise PGDeleteError(str(e))
 
     async def delete_by_id(
         cls, session: AsyncSession, model: Any, record_id: Union[int, uuid.UUID]
@@ -180,6 +199,5 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
             stmt = select(model).where(model.id == record_id)
             record: BaseModel = await cls.select_one_strict(session, stmt)
             return await cls.delete(session, record)
-        except DBAPIError as e:
-            cls.logger.info(f"Error in remove_records_sync: {e}")
-            raise e
+        except Exception as e:
+            raise PGDeleteError(str(e))

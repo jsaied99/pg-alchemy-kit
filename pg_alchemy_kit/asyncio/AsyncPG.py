@@ -32,12 +32,12 @@ def get_async_engine(url, **kwargs):
 
 
 class AsyncPG:
+
     def initialize(
         self,
         url: str = None,
-        logger: logging.Logger = None,
         single_transaction: bool = False,
-        pgUtils: AsyncPGUtilsBase = PGUtils,
+        pgUtils: AsyncPGUtilsORM = AsyncPGUtilsORM,
         **kwargs,
     ):
         async_pg_utils_kwargs: dict = kwargs.pop("async_pg_utils_kwargs", {})
@@ -62,16 +62,9 @@ class AsyncPG:
             self.session_factory, scopefunc=current_task
         )
 
-        self.logger = logger
-
-        if self.logger is None:
-            self.logger = logging.getLogger("sqlalchemy.engine")
-
         self.utils: AsyncPGUtilsBase = pgUtils(
-            self.logger, single_transaction, **async_pg_utils_kwargs
+            single_transaction, **async_pg_utils_kwargs
         )
-
-        self.logger.info(f"Initialized {self.__class__.__name__}")
 
     async def create_tables(
         self, Bases: List[DeclarativeMeta], schemas: List[str] = ["public"]
@@ -87,12 +80,9 @@ class AsyncPG:
 
         async with self.engine.begin() as conn:
             for Base, schema in zip(Bases, schemas):
-                try:
-                    if schema not in self.inspector.get_schema_names():
-                        await conn.execute(sqlalchemy.schema.CreateSchema(schema))
-                    await conn.run_sync(Base.metadata.create_all)
-                except Exception as e:
-                    self.logger.info(f"Error in create_tables: {e}")
+                if schema not in self.inspector.get_schema_names():
+                    await conn.execute(sqlalchemy.schema.CreateSchema(schema))
+                await conn.run_sync(Base.metadata.create_all)
 
     @asynccontextmanager
     async def get_session_ctx(self) -> AsyncGenerator[AsyncSession, None]:

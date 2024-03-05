@@ -25,10 +25,7 @@ class BaseModel:
 
 
 class AsyncPGUtilsBase(ABC):
-    def __init__(
-        self, logger: logging.Logger, single_transaction: bool = False, **kwargs
-    ):
-        self.logger: logging.Logger = logger
+    def __init__(self, single_transaction: bool = False, **kwargs):
         self.single_transaction = single_transaction
         self.snake_case = kwargs.get("snake_case", False)
 
