@@ -129,14 +129,12 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
                 setattr(obj, key, value)
 
             if not cls.single_transaction:
-                print("committing")
                 await session.commit()
 
             return obj
 
         except Exception as e:
-            if not cls.single_transaction:
-                await session.rollback()
+            await session.rollback()
             raise PGUpdateError(str(e))
 
     async def insert(
@@ -156,8 +154,7 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
                 await session.flush()
             return obj
         except Exception as e:
-            if not cls.single_transaction:
-                await session.rollback()
+            await session.rollback()
             raise PGInsertError(str(e))
 
     async def bulk_insert(
@@ -175,8 +172,7 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             return records
         except Exception:
-            if not cls.single_transaction:
-                await session.rollback()
+            await session.rollback()
             return []
 
     async def delete(
@@ -188,8 +184,7 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
                 await session.commit()
             return True
         except Exception as e:
-            if not cls.single_transaction:
-                await session.rollback()
+            await session.rollback()
             raise PGDeleteError(str(e))
 
     async def delete_by_id(
