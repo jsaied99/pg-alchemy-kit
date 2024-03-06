@@ -130,6 +130,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             if not cls.single_transaction:
                 await session.commit()
+            else:
+                await session.flush()
 
             return obj
 
@@ -169,6 +171,8 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
 
             if not cls.single_transaction:
                 await session.commit()
+            else:
+                await session.flush()
 
             return records
         except Exception:
