@@ -62,7 +62,7 @@ class AsyncPG:
             self.session_factory, scopefunc=current_task
         )
 
-        self.utils: AsyncPGUtilsBase = pgUtils(
+        self.utils: AsyncPGUtilsORM = pgUtils(
             single_transaction, **async_pg_utils_kwargs
         )
 
@@ -92,12 +92,8 @@ class AsyncPG:
     @asynccontextmanager
     async def transaction(self) -> AsyncGenerator[Session, None]:
         async with self.Session() as session:
-            try:
+            async with session.begin():
                 yield session
-                await session.commit()
-            except Exception as e:
-                await session.rollback()
-                raise e
 
     async def close(self):
         await self.engine.dispose()
