@@ -3,7 +3,6 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import Select, text
 from sqlalchemy.exc import DBAPIError
-import logging
 import uuid
 from typing import Any, List, Optional, Union
 from abc import ABC, abstractmethod
@@ -24,11 +23,8 @@ class BaseModel:
 
 
 class PGUtilsBase(ABC):
-    def __init__(
-        self, logger: logging.Logger, single_transaction: bool = False, **kwargs
-    ):
+    def __init__(self, single_transaction: bool = False, **kwargs):
         self.session = None
-        self.logger: logging.Logger = logger
         self.single_transaction = single_transaction
         self.snake_case = kwargs.get("snake_case", False)
 

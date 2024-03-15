@@ -88,7 +88,6 @@ class PGUtilsORM(PGUtilsBase):
             return obj
 
         except DBAPIError as e:
-            cls.logger.info(f"Error in update: {e}")
             if not cls.single_transaction:
                 session.rollback()
             raise e
@@ -107,7 +106,6 @@ class PGUtilsORM(PGUtilsBase):
                 session.commit()
             return True
         except DBAPIError as e:
-            cls.logger.info(f"Error in bulk_update: {e}")
             if not cls.single_transaction:
                 session.rollback()
             raise e
@@ -129,7 +127,6 @@ class PGUtilsORM(PGUtilsBase):
                 session.flush()
             return obj
         except DBAPIError as e:
-            cls.logger.info(f"Error in add_record_sync: {e}")
             session.rollback()
             raise e
 
@@ -149,7 +146,6 @@ class PGUtilsORM(PGUtilsBase):
             return records
         except DBAPIError as e:
             cls.session.rollback()
-            cls.logger.info(f"Error in add_records_sync: {e}")
             return []
 
     def insert_on_conflict(
@@ -170,7 +166,6 @@ class PGUtilsORM(PGUtilsBase):
         except DBAPIError as e:
             if not cls.single_transaction:
                 session.rollback()
-            cls.logger.info(f"Error in remove_records_sync: {e}")
             raise e
 
     def delete_by_id(
@@ -181,5 +176,4 @@ class PGUtilsORM(PGUtilsBase):
             record: BaseModel = cls.select_one_strict(session, stmt)
             return cls.delete(session, record)
         except DBAPIError as e:
-            cls.logger.info(f"Error in remove_records_sync: {e}")
             raise e

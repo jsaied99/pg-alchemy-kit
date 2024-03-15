@@ -4,8 +4,6 @@ from .AsyncPGUtilsBase import AsyncPGUtilsBase
 
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm import DeclarativeMeta
-import sqlalchemy
-import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, List
 from sqlalchemy.ext.asyncio import (
@@ -66,22 +64,15 @@ class AsyncPG:
             single_transaction, **async_pg_utils_kwargs
         )
 
-    async def create_tables(
-        self, Bases: List[DeclarativeMeta], schemas: List[str] = ["public"]
-    ):
+    async def create_tables(self, Bases: List[DeclarativeMeta]):
         """
         Creates tables for all the models in the list of Bases
         """
         if type(Bases) != list:
             Bases = [Bases]
 
-        if type(schemas) != list:
-            schemas = [schemas]
-
         async with self.engine.begin() as conn:
-            for Base, schema in zip(Bases, schemas):
-                if schema not in self.inspector.get_schema_names():
-                    await conn.execute(sqlalchemy.schema.CreateSchema(schema))
+            for Base in Bases:
                 await conn.run_sync(Base.metadata.create_all)
 
     @asynccontextmanager

@@ -8,7 +8,6 @@ from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.orm import DeclarativeMeta
 import sqlalchemy
-import logging
 from contextlib import contextmanager
 from typing import List, Iterator
 
@@ -17,7 +16,6 @@ class PG:
     def initialize(
         self,
         url: str = None,
-        logger: logging.Logger = None,
         single_transaction: bool = False,
         pgUtils: PGUtilsBase = PGUtils,
         **kwargs,
@@ -31,19 +29,8 @@ class PG:
             autocommit=False, autoflush=False, bind=self.engine, **session_maker_kwargs
         )
         self.inspector = inspect(self.engine)
-        self.logger = logger
 
-        if self.logger is None:
-            logger = logging.getLogger(__name__)
-            logger.setLevel(logging.INFO)
-            logger.addHandler(logging.StreamHandler())
-            self.logger = logger
-
-        self.utils: PGUtilsBase = pgUtils(
-            self.logger, single_transaction, **pg_utils_kwargs
-        )
-
-        self.logger.info("Initialized PG")
+        self.utils: PGUtilsBase = pgUtils(single_transaction, **pg_utils_kwargs)
 
     def create_tables(
         self, Bases: List[DeclarativeMeta], schemas: List[str] = ["public"]
@@ -64,7 +51,7 @@ class PG:
                         conn.execute(sqlalchemy.schema.CreateSchema(schema))
                     Base.metadata.create_all(self.engine)
                 except Exception as e:
-                    self.logger.info(f"Error in create_tables: {e}")
+                    print(f"Error creating tables for schema {schema}: {e}")
 
     @contextmanager
     def get_session_ctx(self) -> Iterator[Session]:

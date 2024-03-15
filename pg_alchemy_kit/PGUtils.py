@@ -6,7 +6,6 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import select
 
-import logging
 from typing import Any, List, Optional, Union
 import uuid
 import os
@@ -39,11 +38,8 @@ class BaseModel:
 
 
 class PGUtils:
-    def __init__(
-        cls, logger: logging.Logger, single_transaction: bool = False, **kwargs
-    ):
+    def __init__(cls, single_transaction: bool = False, **kwargs):
         cls.session = None
-        cls.logger = logger
         cls.single_transaction = single_transaction
         cls.snake_case = kwargs.get("snake_case", False)
 
@@ -132,7 +128,6 @@ class PGUtils:
             stmt: text = text(sql)
             insert = session.execute(stmt, params=params)
             count = insert.rowcount
-            cls.logger.info(f"Inserted {count} rows")
 
             if not cls.single_transaction:
                 session.commit()
@@ -148,7 +143,6 @@ class PGUtils:
             stmt: text = text(sql)
             insert = session.execute(stmt, params=params)
             count = insert.rowcount
-            cls.logger.info(f"Deleted {count} rows")
             if not cls.single_transaction:
                 session.commit()
 
@@ -195,7 +189,6 @@ class PGUtils:
                 session.commit()
             return True
         except DBAPIError as e:
-            cls.logger.info(f"Error in update: {e}")
             if not cls.single_transaction:
                 session.rollback()
             raise e
@@ -219,7 +212,6 @@ class PGUtils:
             return obj
 
         except DBAPIError as e:
-            cls.logger.info(f"Error in update: {e}")
             if not cls.single_transaction:
                 session.rollback()
             raise e
@@ -233,7 +225,6 @@ class PGUtils:
                 session.commit()
             return True
         except DBAPIError as e:
-            cls.logger.info(f"Error in bulk_update: {e}")
             if not cls.single_transaction:
                 session.rollback()
             raise e
@@ -255,7 +246,6 @@ class PGUtils:
                 session.flush()
             return obj
         except DBAPIError as e:
-            cls.logger.info(f"Error in add_record_sync: {e}")
             session.rollback()
             return None
 
@@ -275,7 +265,6 @@ class PGUtils:
             return records
         except DBAPIError as e:
             cls.session.rollback()
-            cls.logger.info(f"Error in add_records_sync: {e}")
             return []
 
     def insert_orm_on_conflict(
@@ -296,7 +285,6 @@ class PGUtils:
         except DBAPIError as e:
             if not cls.single_transaction:
                 session.rollback()
-            cls.logger.info(f"Error in remove_records_sync: {e}")
             return False
 
     def delete_orm_by_id(
@@ -307,7 +295,6 @@ class PGUtils:
             record: BaseModel = cls.select_orm_one_strict(session, stmt)
             return cls.delete_orm(session, record)
         except DBAPIError as e:
-            cls.logger.info(f"Error in remove_records_sync: {e}")
             return False
 
     def get_uuid(
@@ -323,7 +310,6 @@ class PGUtils:
             stmt = f"SELECT uuid FROM {table_name} WHERE {key} = :{key}"
             return cls.select(session, stmt, key_value)[0]["uuid"]
         except Exception as e:
-            cls.logger.info(f"Error in get_uuid: {e}")
             return None
 
     @staticmethod

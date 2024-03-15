@@ -2,7 +2,6 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import Select, text
 from sqlalchemy.exc import DBAPIError
-import logging
 import uuid
 from typing import Any, List, Optional, Union
 from abc import ABC, abstractmethod
