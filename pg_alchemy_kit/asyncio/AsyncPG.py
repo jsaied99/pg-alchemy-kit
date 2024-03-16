@@ -14,14 +14,26 @@ from sqlalchemy.ext.asyncio import (
     async_scoped_session,
 )
 from asyncio import current_task
+from sqlalchemy.pool import NullPool
 
 
 def get_async_engine(url, **kwargs):
+
+    pool_pre_ping = kwargs.pop("pool_pre_ping", True)
+    echo = kwargs.pop("echo", True)
+    if kwargs.get("poolclass") == NullPool:
+        return create_async_engine(
+            url,
+            echo=echo,
+            pool_pre_ping=pool_pre_ping,
+            **kwargs,
+        )
+
     pool_size = kwargs.pop("pool_size", 5)
     max_overflow = kwargs.pop("max_overflow", 0)
-    pool_pre_ping = kwargs.pop("pool_pre_ping", True)
     return create_async_engine(
         url,
+        echo=echo,
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_pre_ping=pool_pre_ping,
