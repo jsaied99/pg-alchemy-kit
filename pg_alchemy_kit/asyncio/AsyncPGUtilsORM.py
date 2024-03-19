@@ -86,6 +86,13 @@ class AsyncPGUtilsORM(AsyncPGUtilsBase):
             raise PGNotExistsError("No records found")
         return result
 
+    async def select_one_or_none(
+        cls, session: AsyncSession, stmt: Select, **kwargs
+    ) -> Union[BaseModel, None, Exception]:
+        result = await session.execute(stmt)
+        result: Optional[BaseModel] = result.scalars().one_or_none()
+        return result
+
     async def check_exists(
         cls, session: AsyncSession, stmt: Select, **kwargs
     ) -> Union[bool, Exception]:

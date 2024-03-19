@@ -95,6 +95,12 @@ class AsyncPGUtilsBase(ABC):
         pass
 
     @abstractmethod
+    async def select_one_or_none(
+        self, session: AsyncSession, stmt: Select, **kwargs
+    ) -> Union[BaseModel, None]:
+        pass
+
+    @abstractmethod
     async def check_exists(
         self, session: AsyncSession, stmt: Select, **kwargs
     ) -> Union[bool, Exception]:
