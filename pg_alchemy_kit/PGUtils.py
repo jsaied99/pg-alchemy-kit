@@ -393,9 +393,9 @@ class PGUtils:
 
 def get_engine(url: str, **kwargs) -> Engine:
     try:
-        pool_size = kwargs.get("pool_size", 5)
-        max_overflow = kwargs.get("max_overflow", 0)
-        pool_pre_ping = kwargs.get("pool_pre_ping", True)
+        pool_size = kwargs.pop("pool_size", 5)
+        max_overflow = kwargs.pop("max_overflow", 0)
+        pool_pre_ping = kwargs.pop("pool_pre_ping", True)
         return create_engine(
             url,
             pool_size=pool_size,
