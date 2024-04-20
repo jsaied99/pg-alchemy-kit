@@ -1,11 +1,6 @@
-from pg_alchemy_kit.PGUtils import PGUtils, get_engine_url
 from .AsyncPGUtilsORM import AsyncPGUtilsORM
-from .AsyncPGUtilsBase import AsyncPGUtilsBase
-
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm import DeclarativeMeta
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
@@ -14,48 +9,36 @@ from sqlalchemy.ext.asyncio import (
     async_scoped_session,
 )
 from asyncio import current_task
-from sqlalchemy.pool import NullPool
+
+from typing import Any, TypedDict
+from typing_extensions import Unpack, NotRequired
 
 
-def get_async_engine(url, **kwargs):
-
-    pool_pre_ping = kwargs.pop("pool_pre_ping", True)
-    echo = kwargs.pop("echo", True)
-    if kwargs.get("poolclass") == NullPool:
-        return create_async_engine(
-            url,
-            echo=echo,
-            pool_pre_ping=pool_pre_ping,
-            **kwargs,
-        )
-
-    pool_size = kwargs.pop("pool_size", 5)
-    max_overflow = kwargs.pop("max_overflow", 0)
-    return create_async_engine(
-        url,
-        echo=echo,
-        pool_size=pool_size,
-        max_overflow=max_overflow,
-        pool_pre_ping=pool_pre_ping,
-        **kwargs,
-    )
+class InitParams(TypedDict):
+    async_engine_kwargs: NotRequired[dict[str, Any]]
+    async_pg_utils_kwargs: NotRequired[dict[str, Any]]
+    async_session_maker_kwargs: NotRequired[dict[str, Any]]
+    echo: NotRequired[bool]
+    pool_size: NotRequired[int]
+    max_overflow: NotRequired[int]
 
 
 class AsyncPG:
 
     def initialize(
         self,
-        url: str = None,
+        url: str,
         single_transaction: bool = False,
-        pgUtils: AsyncPGUtilsORM = AsyncPGUtilsORM,
-        **kwargs,
+        **kwargs: Unpack[InitParams],
     ):
-        async_pg_utils_kwargs: dict = kwargs.pop("async_pg_utils_kwargs", {})
-        async_session_maker_kwargs: dict = kwargs.pop("async_session_maker_kwargs", {})
-        async_engine_kwargs: dict = kwargs.pop("async_engine_kwargs", {})
+        async_pg_utils_kwargs: dict[str, Any] = kwargs.pop("async_pg_utils_kwargs", {})
+        async_session_maker_kwargs: dict[str, Any] = kwargs.pop(
+            "async_session_maker_kwargs", {}
+        )
+        async_engine_kwargs: dict[str, Any] = kwargs.pop("async_engine_kwargs", {})
 
-        self.url = url or get_engine_url(connection_type="postgresql+asyncpg")
-        self.engine: AsyncEngine = get_async_engine(self.url, **async_engine_kwargs)
+        self.url: str = url
+        self.engine: AsyncEngine = create_async_engine(self.url, **async_engine_kwargs)
 
         autoflush = async_session_maker_kwargs.pop("autoflush", False)
         expire_on_commit = async_session_maker_kwargs.pop("expire_on_commit", False)
@@ -72,20 +55,9 @@ class AsyncPG:
             self.session_factory, scopefunc=current_task
         )
 
-        self.utils: AsyncPGUtilsORM = pgUtils(
+        self.utils: AsyncPGUtilsORM = AsyncPGUtilsORM(
             single_transaction, **async_pg_utils_kwargs
         )
-
-    async def create_tables(self, Bases: List[DeclarativeMeta]):
-        """
-        Creates tables for all the models in the list of Bases
-        """
-        if type(Bases) != list:
-            Bases = [Bases]
-
-        async with self.engine.begin() as conn:
-            for Base in Bases:
-                await conn.run_sync(Base.metadata.create_all)
 
     @asynccontextmanager
     async def get_session_ctx(self) -> AsyncGenerator[AsyncSession, None]:
@@ -93,7 +65,7 @@ class AsyncPG:
             yield session
 
     @asynccontextmanager
-    async def transaction(self) -> AsyncGenerator[Session, None]:
+    async def transaction(self) -> AsyncGenerator[AsyncSession, None]:
         async with self.Session() as session:
             async with session.begin():
                 yield session
