@@ -92,12 +92,12 @@ class AsyncPGUtilsORM(Generic[T]):
         self.snake_case = kwargs.get("snake_case", False)
 
     async def __execute_all(
-        self, session: AsyncSession, stmt: Select, **kwargs
+        self, session: AsyncSession, stmt: Select[T], **kwargs
     ) -> list[T]:
         result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def select(self, session: AsyncSession, stmt: Select) -> list[T]:
+    async def select(self, session: AsyncSession, stmt: Select[T]) -> list[T]:
         try:
             results: list[T] = await self.__execute_all(session, stmt)
 
@@ -108,7 +108,7 @@ class AsyncPGUtilsORM(Generic[T]):
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one(self, session: AsyncSession, stmt: Select) -> T:
+    async def select_one(self, session: AsyncSession, stmt: Select[T]) -> T:
         try:
             results: list[T] = await self.__execute_all(session, stmt)
 
@@ -121,7 +121,7 @@ class AsyncPGUtilsORM(Generic[T]):
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one_strict(self, session: AsyncSession, stmt: Select) -> T:
+    async def select_one_strict(self, session: AsyncSession, stmt: Select[T]) -> T:
         result = await session.execute(stmt)
         result: T | None = result.scalars().one()
 
@@ -129,12 +129,14 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGNotExistsError("No records found")
         return result
 
-    async def select_one_or_none(self, session: AsyncSession, stmt: Select) -> T:
+    async def select_one_or_none(self, session: AsyncSession, stmt: Select[T]) -> T:
         result = await session.execute(stmt)
         result: T | None = result.scalars().one_or_none()
         return result
 
-    async def check_exists(self, session: AsyncSession, stmt: Select, **kwargs) -> bool:
+    async def check_exists(
+        self, session: AsyncSession, stmt: Select[T], **kwargs
+    ) -> bool:
         try:
             results: list[T] = await self.__execute_all(session, stmt)
 
@@ -145,7 +147,7 @@ class AsyncPGUtilsORM(Generic[T]):
         except Exception as e:
             raise PGNotExistsError(str(e))
 
-    async def execute(self, session: AsyncSession, stmt: Select) -> bool:
+    async def execute(self, session: AsyncSession, stmt: Select[T]) -> bool:
         try:
             tmp = await session.execute(stmt)
             return tmp.fetchall()
