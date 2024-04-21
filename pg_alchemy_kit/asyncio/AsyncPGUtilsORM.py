@@ -155,18 +155,16 @@ class AsyncPGUtilsORM(Generic[T]):
     async def update(
         self,
         session: AsyncSession,
-        Model: T,
+        Model: Any,
         filter_by: dict,
         values: dict,
-        **kwargs,
     ) -> T:
         try:
             obj = await self.select_one_strict(
                 session, select(Model).filter_by(**filter_by)
             )
-            to_snake_case = kwargs.get("to_snake_case", self.snake_case)
 
-            if to_snake_case:
+            if self.snake_case:
                 values = self.to_snake_case([values])[0]
 
             for key, value in values.items():
@@ -231,7 +229,7 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGDeleteError(str(e))
 
     async def delete_by_id(
-        self, session: AsyncSession, model: T, record_id: int | uuid.UUID
+        self, session: AsyncSession, model: Any, record_id: int | uuid.UUID
     ) -> bool:
         try:
             stmt = select(model).where(model.id == record_id)
