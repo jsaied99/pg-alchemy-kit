@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import select, Select
 
-from typing import Any, TypeVar, Type, Generic, TypedDict
+from typing import Any, TypeVar, Generic, TypedDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import TextClause, text
 import pandas as pd
@@ -184,7 +184,7 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGUpdateError(str(e))
 
     async def insert(
-        self, session: AsyncSession, model: Type[T], record: dict[str, Any]
+        self, session: AsyncSession, model: T, record: dict[str, Any]
     ) -> T:
         try:
             if self.snake_case:
