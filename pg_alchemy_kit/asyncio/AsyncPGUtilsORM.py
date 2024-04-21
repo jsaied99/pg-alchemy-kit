@@ -156,8 +156,8 @@ class AsyncPGUtilsORM(Generic[T]):
         self,
         session: AsyncSession,
         Model: Any,
-        filter_by: dict,
-        values: dict,
+        filter_by: dict[str, Any],
+        values: dict[str, Any],
     ) -> T:
         try:
             obj = await self.select_one_strict(
