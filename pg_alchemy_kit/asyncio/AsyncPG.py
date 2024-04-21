@@ -1,4 +1,4 @@
-from .AsyncPGUtilsORM import AsyncPGUtilsORM
+from .AsyncPGUtilsORM import AsyncPGUtilsORM, PGUtilsParams
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
@@ -10,17 +10,21 @@ from sqlalchemy.ext.asyncio import (
 )
 from asyncio import current_task
 
-from typing import Any, TypedDict
+from typing import Any, TypedDict, TypeVar
 from typing_extensions import Unpack, NotRequired
+from warnings import warn
 
 
 class InitParams(TypedDict):
     async_engine_kwargs: NotRequired[dict[str, Any]]
-    async_pg_utils_kwargs: NotRequired[dict[str, Any]]
+    async_pg_utils_kwargs: NotRequired[PGUtilsParams]
     async_session_maker_kwargs: NotRequired[dict[str, Any]]
     echo: NotRequired[bool]
     pool_size: NotRequired[int]
     max_overflow: NotRequired[int]
+
+
+T = TypeVar("T")
 
 
 class AsyncPG:
@@ -28,10 +32,11 @@ class AsyncPG:
     def initialize(
         self,
         url: str,
-        single_transaction: bool = False,
         **kwargs: Unpack[InitParams],
     ):
-        async_pg_utils_kwargs: dict[str, Any] = kwargs.pop("async_pg_utils_kwargs", {})
+        self.async_pg_utils_kwargs: PGUtilsParams = kwargs.pop(
+            "async_pg_utils_kwargs", {}
+        )
         async_session_maker_kwargs: dict[str, Any] = kwargs.pop(
             "async_session_maker_kwargs", {}
         )
@@ -55,9 +60,19 @@ class AsyncPG:
             self.session_factory, scopefunc=current_task
         )
 
-        self.utils: AsyncPGUtilsORM = AsyncPGUtilsORM(
-            single_transaction, **async_pg_utils_kwargs
+        self._utils: AsyncPGUtilsORM = AsyncPGUtilsORM(**self.async_pg_utils_kwargs)
+
+    @property
+    def utils(self):
+        warn(
+            "The 'utils' attribute is deprecated and will be removed in a future release. Please use get_utils(model) instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
+        return self._utils
+
+    def get_utils(self, model: T) -> AsyncPGUtilsORM[T]:
+        return AsyncPGUtilsORM[model](**self.async_pg_utils_kwargs)
 
     @asynccontextmanager
     async def get_session_ctx(self) -> AsyncGenerator[AsyncSession, None]:

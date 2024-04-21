@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import select, Select
 
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Type, Generic, TypedDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import TextClause, text
 import pandas as pd
@@ -36,7 +36,12 @@ class PGDeleteError(PGBaseError):
 T = TypeVar("T")
 
 
-class AsyncPGUtilsORM:
+class PGUtilsParams(TypedDict):
+    single_transaction: bool
+    snake_case: bool
+
+
+class AsyncPGUtilsORM(Generic[T]):
     def __init__(self, single_transaction: bool = False, **kwargs):
         self.single_transaction = single_transaction
         self.snake_case = kwargs.get("snake_case", False)
@@ -92,7 +97,7 @@ class AsyncPGUtilsORM:
         result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def select(self, session: AsyncSession, stmt: Select, **kwargs) -> list[T]:
+    async def select(self, session: AsyncSession, stmt: Select) -> list[T]:
         try:
             results: list[T] = await self.__execute_all(session, stmt)
 
@@ -103,7 +108,7 @@ class AsyncPGUtilsORM:
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one(self, session: AsyncSession, stmt: Select, **kwargs) -> T:
+    async def select_one(self, session: AsyncSession, stmt: Select) -> T:
         try:
             results: list[T] = await self.__execute_all(session, stmt)
 
@@ -116,19 +121,15 @@ class AsyncPGUtilsORM:
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one_strict(
-        self, session: AsyncSession, stmt: Select, **kwargs
-    ) -> T:
+    async def select_one_strict(self, session: AsyncSession, stmt: Select) -> T:
         result = await session.execute(stmt)
-        result: "T" | None = result.scalars().one()
+        result: T | None = result.scalars().one()
 
         if result is None:
             raise PGNotExistsError("No records found")
         return result
 
-    async def select_one_or_none(
-        self, session: AsyncSession, stmt: Select, **kwargs
-    ) -> T:
+    async def select_one_or_none(self, session: AsyncSession, stmt: Select) -> T:
         result = await session.execute(stmt)
         result: T | None = result.scalars().one_or_none()
         return result
@@ -182,11 +183,11 @@ class AsyncPGUtilsORM:
             await session.rollback()
             raise PGUpdateError(str(e))
 
-    async def insert(self, session: AsyncSession, model, record: dict, **kwargs) -> T:
+    async def insert(
+        self, session: AsyncSession, model: Type[T], record: dict[str, Any]
+    ) -> T:
         try:
-            to_snake_case = kwargs.get("to_snake_case", self.snake_case)
-
-            if to_snake_case:
+            if self.snake_case:
                 record = self.to_snake_case([record])[0]
 
             obj = model(**record)
