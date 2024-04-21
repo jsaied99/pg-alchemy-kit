@@ -184,7 +184,7 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGUpdateError(str(e))
 
     async def insert(
-        self, session: AsyncSession, model: T, record: dict[str, Any]
+        self, session: AsyncSession, model: Any, record: dict[str, Any]
     ) -> T:
         try:
             if self.snake_case:
