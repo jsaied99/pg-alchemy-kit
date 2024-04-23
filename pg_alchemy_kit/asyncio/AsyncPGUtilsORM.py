@@ -87,10 +87,6 @@ class AsyncPGUtilsORM(Generic[T]):
 
         return pd.DataFrame(results)
 
-    def __init__(self, single_transaction: bool = False, **kwargs):
-        self.single_transaction = single_transaction
-        self.snake_case = kwargs.get("snake_case", False)
-
     async def __execute_all(
         self, session: AsyncSession, stmt: Select[T], **kwargs
     ) -> list[T]:
@@ -197,6 +193,18 @@ class AsyncPGUtilsORM(Generic[T]):
             else:
                 await session.flush()
             return obj
+        except Exception as e:
+            await session.rollback()
+            raise PGInsertError(str(e))
+
+    async def insert_dto(self, session: AsyncSession, model: T) -> T:
+        try:
+            session.add(model)
+            if not self.single_transaction:
+                await session.commit()
+            else:
+                await session.flush()
+            return model
         except Exception as e:
             await session.rollback()
             raise PGInsertError(str(e))
