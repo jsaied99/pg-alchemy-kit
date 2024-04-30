@@ -1,12 +1,11 @@
 import uuid
 from sqlalchemy import select, Select
 
-from typing import Any, TypeVar, Generic, TypedDict
+from typing import Any, TypeVar, Generic, TypedDict, Unpack, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import TextClause, text
 import pandas as pd
-from sqlalchemy.orm.query import Query
-from sqlalchemy.dialects import postgresql
+from collections.abc import Sequence
 
 
 class PGBaseError(Exception):
@@ -37,12 +36,19 @@ T = TypeVar("T")
 
 
 class PGUtilsParams(TypedDict):
-    single_transaction: bool
     snake_case: bool
 
 
+class RawTextSelectParams(TypedDict):
+    params: dict[str, Any]
+
+
 class AsyncPGUtilsORM(Generic[T]):
-    def __init__(self, single_transaction: bool = False, **kwargs):
+
+    def __init__(
+        self, single_transaction: bool = False, **kwargs: Unpack[PGUtilsParams]
+    ):
+        super().__init__()
         self.single_transaction = single_transaction
         self.snake_case = kwargs.get("snake_case", False)
 
@@ -54,62 +60,49 @@ class AsyncPGUtilsORM(Generic[T]):
         return text(f"SELECT json_agg(t) FROM ({stmt}) t")
 
     async def raw_text_select(
-        cls, session: AsyncSession, sql: str, **kwargs
+        self, session: AsyncSession, sql: str, **kwargs: Unpack[RawTextSelectParams]
     ) -> list[dict[str, Any]]:
         params = kwargs.get("params", {})
-        to_camel_case = kwargs.get("to_camel_case", False)
 
-        stmt: text = cls.__wrap_to_json(sql)
-        results = await session.execute(stmt, params=params)
-        results = results.fetchone()[0]
+        stmt: TextClause = self.__wrap_to_json(sql)
+        wrapped_results = await session.execute(stmt, params=params)
+        results = wrapped_results.fetchone()
+
         if results is None:
             return []
 
-        if to_camel_case:
-            results = cls.__results_to_camel_case(results)
-
-        return results
+        return results[0]
 
     async def raw_text_select_into_df(
-        cls, session: AsyncSession, sql: str, **kwargs
+        self, session: AsyncSession, sql: str, **kwargs: Unpack[RawTextSelectParams]
     ) -> pd.DataFrame:
-        params = kwargs.get("params", {})
-        to_camel_case = kwargs.get("to_camel_case", False)
-
-        stmt: text = cls.__wrap_to_json(sql)
-        results = await session.execute(stmt, params=params)
-        results = results.fetchone()[0]
-        if results is None:
-            return pd.DataFrame([])
-
-        if to_camel_case:
-            results = cls.__results_to_camel_case(results)
-
-        return pd.DataFrame(results)
+        records = await self.raw_text_select(session, sql, **kwargs)
+        return pd.DataFrame(records)
 
     async def __execute_all(
-        self, session: AsyncSession, stmt: Select[T], **kwargs
-    ) -> list[T]:
+        self,
+        session: AsyncSession,
+        stmt: Select[tuple[T]],
+    ) -> Sequence[T]:
         result = await session.execute(stmt)
         return result.scalars().all()
 
-    async def select(self, session: AsyncSession, stmt: Select[T]) -> list[T]:
+    async def select(self, session: AsyncSession, stmt: Select[tuple[T]]) -> list[T]:
         try:
-            results: list[T] = await self.__execute_all(session, stmt)
-
-            if results is None:
-                return []
-            return results
+            results: Sequence[T] = await self.__execute_all(session, stmt)
+            return cast(list[T], results)
 
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one(self, session: AsyncSession, stmt: Select[T]) -> T:
+    async def select_one(
+        self, session: AsyncSession, stmt: Select[tuple[T]]
+    ) -> T | None:
         try:
-            results: list[T] = await self.__execute_all(session, stmt)
+            results: Sequence[T] = await self.__execute_all(session, stmt)
 
-            if results is None or len(results) != 1:
-                return {}
+            if len(results) != 1:
+                return None
 
             result: T = results[0]
             return result
@@ -134,20 +127,17 @@ class AsyncPGUtilsORM(Generic[T]):
         result_one: T | None = result.scalars().one_or_none()
         return result_one
 
-    async def check_exists(
-        self, session: AsyncSession, stmt: Select[T], **kwargs
-    ) -> bool:
+    async def check_exists(self, session: AsyncSession, stmt: Select[tuple[T]]) -> bool:
         try:
-            results: list[T] = await self.__execute_all(session, stmt)
-
-            if results is None:
-                return False
+            results: Sequence[T] = await self.__execute_all(session, stmt)
             return len(results) > 0
 
         except Exception as e:
             raise PGNotExistsError(str(e))
 
-    async def execute(self, session: AsyncSession, stmt: Select[T]) -> bool:
+    async def execute(
+        self, session: AsyncSession, stmt: Select[tuple[Any]]
+    ) -> Sequence[Any]:
         try:
             tmp = await session.execute(stmt)
             return tmp.fetchall()
@@ -214,10 +204,12 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGInsertError(str(e))
 
     async def bulk_insert(
-        self, session: AsyncSession, model: Any, records: list[dict], **kwargs
+        self, session: AsyncSession, model: Any, records: list[dict[str, Any]]
     ) -> bool:
         try:
-            records_to_insert: list[dict] = [model(**record) for record in records]
+            records_to_insert: list[dict[str, Any]] = [
+                model(**record) for record in records
+            ]
 
             session.add_all(records_to_insert)
             await session.flush()  # Flush the records to obtain their IDs
@@ -243,7 +235,7 @@ class AsyncPGUtilsORM(Generic[T]):
             raise PGDeleteError(str(e))
 
     async def delete_by_id(
-        self, session: AsyncSession, model: Any, record_id: int | uuid.UUID
+        self, session: AsyncSession, model: Any, record_id: Any
     ) -> bool:
         try:
             stmt = select(model).where(model.id == record_id)
@@ -284,50 +276,3 @@ class AsyncPGUtilsORM(Generic[T]):
             {self.__to_snake_case(key): value for key, value in record.items()}
             for record in results
         ]
-
-    @staticmethod
-    def __to_camel_case(snake_str: str) -> str:
-        """
-        Convert a snake_case string to camelCase.
-
-        Parameters:
-        snake_str (str): The snake_case string to convert.
-
-        Returns:
-        str: The string in camelCase.
-        """
-        components = snake_str.split("_")
-        return components[0] + "".join(x.title() for x in components[1:])
-
-    def __results_to_camel_case(
-        self, results: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """
-        Convert all keys in a list of dictionaries from snake_case to camelCase.
-
-        Parameters:
-        results (List[Dict[str, any]]): A list of dictionaries with snake_case keys.
-
-        Returns:
-        List[Dict[str, any]]: A list of dictionaries with keys in camelCase.
-        """
-        return [
-            {self.__to_camel_case(key): value for key, value in record.items()}
-            for record in results
-        ]
-
-    def print_query(self, query: Query) -> str:
-        """
-        Print the query generated by a SQLAlchemy Query object.
-
-        Parameters:
-        query (Query): The SQLAlchemy Query object to print.
-
-        Returns:
-        str: The query generated by the Query object.
-        """
-        return str(
-            query.statement.compile(
-                dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
-            )
-        )
