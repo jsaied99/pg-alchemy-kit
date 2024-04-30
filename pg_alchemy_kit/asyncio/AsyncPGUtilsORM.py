@@ -117,18 +117,22 @@ class AsyncPGUtilsORM(Generic[T]):
         except Exception as e:
             raise PGSelectError(str(e))
 
-    async def select_one_strict(self, session: AsyncSession, stmt: Select[T]) -> T:
+    async def select_one_strict(
+        self, session: AsyncSession, stmt: Select[tuple[T]]
+    ) -> T:
         result = await session.execute(stmt)
-        result: T | None = result.scalars().one()
+        result_one: T | None = result.scalars().one_or_none()
 
-        if result is None:
+        if result_one is None:
             raise PGNotExistsError("No records found")
-        return result
+        return result_one
 
-    async def select_one_or_none(self, session: AsyncSession, stmt: Select[T]) -> T:
+    async def select_one_or_none(
+        self, session: AsyncSession, stmt: Select[tuple[T]]
+    ) -> T | None:
         result = await session.execute(stmt)
-        result: T | None = result.scalars().one_or_none()
-        return result
+        result_one: T | None = result.scalars().one_or_none()
+        return result_one
 
     async def check_exists(
         self, session: AsyncSession, stmt: Select[T], **kwargs
