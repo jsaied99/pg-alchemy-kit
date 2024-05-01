@@ -1,4 +1,3 @@
-import uuid
 from sqlalchemy import select, Select
 
 from typing import Any, TypeVar, Generic, TypedDict, Unpack, cast
@@ -37,6 +36,7 @@ T = TypeVar("T")
 
 class PGUtilsParams(TypedDict):
     snake_case: bool
+    single_transaction: bool
 
 
 class RawTextSelectParams(TypedDict):
@@ -45,11 +45,9 @@ class RawTextSelectParams(TypedDict):
 
 class AsyncPGUtilsORM(Generic[T]):
 
-    def __init__(
-        self, single_transaction: bool = False, **kwargs: Unpack[PGUtilsParams]
-    ):
+    def __init__(self, **kwargs: Unpack[PGUtilsParams]):
         super().__init__()
-        self.single_transaction = single_transaction
+        self.single_transaction = kwargs.get("single_transaction", True)
         self.snake_case = kwargs.get("snake_case", False)
 
     @staticmethod
@@ -60,7 +58,10 @@ class AsyncPGUtilsORM(Generic[T]):
         return text(f"SELECT json_agg(t) FROM ({stmt}) t")
 
     async def raw_text_select(
-        self, session: AsyncSession, sql: str, **kwargs: Unpack[RawTextSelectParams]
+        self,
+        session: AsyncSession,
+        sql: str | TextClause,
+        **kwargs: Unpack[RawTextSelectParams],
     ) -> list[dict[str, Any]]:
         params = kwargs.get("params", {})
 

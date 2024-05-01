@@ -1,6 +1,6 @@
-from .AsyncPG import AsyncPG
-from .AsyncPGUtilsORM import AsyncPGUtilsORM
-from .AsyncPGUtilsORM import (
+from .pg import AsyncPG
+from .pg_utils import AsyncPGUtilsORM
+from .pg_utils import (
     PGBaseError,
     PGSelectError,
     PGNotExistsError,
