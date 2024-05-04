@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pg-alchemy-kit"
-version = "0.9.19-beta"
+version = "0.100.0"
 description = "A simple wrapper around sqlalchemy to make it easier to use with postgresql"
 authors = ["jsaied99 <jsaied99@gmail.com>"]
 readme = "README.md"
@@ -16,9 +16,21 @@ pyarrow = "^15.0.0"
 asyncpg = "^0.29.0"
 
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.4.3"
+basedpyright = "^1.11.0"
+mypy = "^1.10.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+explicit_package_bases = true
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+files = "pg_alchemy_kit/asyncio/**"
 
 
 [tool.basedpyright]

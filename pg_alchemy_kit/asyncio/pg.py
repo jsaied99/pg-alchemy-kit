@@ -27,7 +27,6 @@ T = TypeVar("T")
 
 
 class AsyncPG:
-
     def initialize(
         self,
         url: str,

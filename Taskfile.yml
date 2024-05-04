@@ -1,0 +1,42 @@
+version: '3'
+
+vars:
+  SOURCES: pg_alchemy_kit/asyncio
+  RUNNER: poetry run
+
+tasks:
+  default:
+    cmd:
+      task: all
+
+  .poetry:
+    internal: true
+    desc: Ensure that poetry is installed
+    silent: true
+    preconditions: []
+
+  lint:
+    desc: Lint python source files
+    deps: [.poetry]
+    cmds:
+      - "{{.RUNNER}} ruff check {{.SOURCES}}"
+      - "{{.RUNNER}} ruff format {{.SOURCES}}"
+
+  typecheck:
+    desc: Perform type-checking
+    deps: [.poetry]
+    silent: true
+    cmd: "{{.RUNNER}} mypy {{.SOURCES}}"
+
+  typecheck-basedpy:
+    desc: Perform type-checking
+    deps: [.poetry]
+    silent: true
+    cmd: "{{.RUNNER}} basedpyright {{.SOURCES}}"
+  
+  all:
+    desc: Run the standard set of checks performed in CI
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: typecheck-basedpy

@@ -44,7 +44,6 @@ class RawTextSelectParams(TypedDict):
 
 
 class AsyncPGUtilsORM(Generic[T]):
-
     def __init__(self, **kwargs: Unpack[PGUtilsParams]):
         super().__init__()
         self.single_transaction = kwargs.get("single_transaction", True)
@@ -52,7 +51,7 @@ class AsyncPGUtilsORM(Generic[T]):
 
     @staticmethod
     def __wrap_to_json(stmt: str | TextClause) -> TextClause:
-        if type(stmt) == str:
+        if isinstance(stmt, str):
             stmt = stmt.replace(";", "")
 
         return text(f"SELECT json_agg(t) FROM ({stmt}) t")
