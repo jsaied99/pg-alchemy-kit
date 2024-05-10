@@ -170,7 +170,6 @@ class AsyncPGUtilsORM(Generic[T]):
             return obj
 
         except Exception as e:
-            await session.rollback()
             raise PGUpdateError(str(e))
 
     async def insert(
@@ -188,7 +187,6 @@ class AsyncPGUtilsORM(Generic[T]):
                 await session.flush()
             return obj
         except Exception as e:
-            await session.rollback()
             raise PGInsertError(str(e))
 
     async def insert_dto(self, session: AsyncSession, model: T) -> T:
@@ -200,7 +198,6 @@ class AsyncPGUtilsORM(Generic[T]):
                 await session.flush()
             return model
         except Exception as e:
-            await session.rollback()
             raise PGInsertError(str(e))
 
     async def bulk_insert(
@@ -221,7 +218,6 @@ class AsyncPGUtilsORM(Generic[T]):
 
             return True
         except Exception:
-            await session.rollback()
             return False
 
     async def delete(self, session: AsyncSession, record: T) -> bool:
@@ -231,7 +227,6 @@ class AsyncPGUtilsORM(Generic[T]):
                 await session.commit()
             return True
         except Exception as e:
-            await session.rollback()
             raise PGDeleteError(str(e))
 
     async def delete_by_id(
